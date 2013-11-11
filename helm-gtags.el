@@ -375,9 +375,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     candidates))
 
 
-(defun helm-gtags-candidates-in-buffer(type &optional in)
-  (helm-gtags-exec-global-command type in)
-  )
 (defvar helm-gtags-command-option-alist
   '((:tag    . "")
     (:rtag   . "-r")
@@ -493,7 +490,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (with-current-buffer helm-current-buffer (helm-gtags-save-current-context))
           ;; (with-helm-buffer (helm-gtags-save-current-context))
           (cdr helm-gtags-tag-cache))
-      (helm-gtags-candidates-in-buffer :tag input)
+      (helm-gtags-exec-global-command :tag input)
       )))
 
 (defun helm-gtags-candidates-in-buffer-symbol(&optional in)
@@ -503,11 +500,11 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (with-current-buffer helm-current-buffer (helm-gtags-save-current-context))
           ;; (with-helm-buffer (helm-gtags-save-current-context))
           (cdr helm-gtags-symbol-cache))
-      (helm-gtags-candidates-in-buffer :symbol input)
+      (helm-gtags-exec-global-command :symbol input)
       )))
 
 (defun helm-gtags-candidates-in-buffer-rtag(&optional in)
-  (helm-gtags-candidates-in-buffer :rtag (or in (car (helm-mp-split-pattern helm-pattern)))))
+  (helm-gtags-exec-global-command :rtag (or in (car (helm-mp-split-pattern helm-pattern)))))
 
 (defun helm-gtags-files-init(&optional in)
   ;; (setq helm-gtags-files-cache (cons default-tag-dir candidates))
