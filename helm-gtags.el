@@ -288,7 +288,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           ;; (put-text-property begin end 'default-directory default-directory)
           ))
       (when default-tag-dir
-        (setq helm-gtags-files-cache (cons default-tag-dir (buffer-string)))
+        (setq helm-gtags-files-cache (cons dirs (buffer-string)))
         ))))
 
 ;; (defun helm-gtags-exec-global-command-init (type &optional input)
@@ -512,17 +512,19 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defun helm-gtags-files-init(&optional in)
   ;; (setq helm-gtags-files-cache (cons default-tag-dir candidates))
   (let ((buf-filename (buffer-file-name (current-buffer)))
-        (tag-rootdir (car helm-gtags-files-cache)))
+        (tag-rootdirs (car helm-gtags-files-cache)))
     (if
         (and helm-gtags-files-cache
-             (or (null tag-rootdir)
-                 (null buf-filename)
-                 (string-match (regexp-quote tag-rootdir)
-                               (file-truename buf-filename))))
+             (or (null buf-filename)
+                 (null tag-rootdirs)
+                 (some '(lambda (dir) (string-match (regexp-quote dir)
+                                                    (file-truename buf-filename))) tag-rootdirs)))
         ;; if current buffer file share the same parent directory with tag root directory,
         ;; then use cache
         (progn
-          (with-current-buffer helm-current-buffer (helm-gtags-save-current-context))
+          (when buf-filename
+            (with-current-buffer (current-buffer)
+              (helm-gtags-save-current-context)))
           (with-current-buffer (helm-candidate-buffer 'global)
             (insert (cdr helm-gtags-files-cache))))
       (helm-gtags-exec-global-command-init-files
