@@ -139,6 +139,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defvar helm-gtags-tag-cache nil)
 (defvar helm-gtags-symbol-cache nil)
 (defvar helm-gtags-files-cache nil)
+(defvar helm-gtags-update-tmp-buf " *helm-gtags-update TAGS*")
 
 (defmacro helm-declare-obsolete-variable (old new version)
   `(progn
@@ -206,13 +207,11 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defun helm-gtags-find-tag-directory()
   (with-temp-buffer
     (let ((status (call-process helm-gtags-global-command nil  (current-buffer) nil  "-p")))
-      (unless (zerop status)
-        ;; (error "GTAGS not found")
-        nil)
-      (goto-char (point-min))
-      (let ((tagroot (buffer-substring
-                      (point) (line-end-position))))
-        (setq helm-gtags-tag-location (file-truename (file-name-as-directory tagroot)))))))
+      (if (zerop status)
+          (let ((tagroot (buffer-substring
+                          (goto-char (point-min)) (line-end-position))))
+            (setq helm-gtags-tag-location (file-truename (file-name-as-directory tagroot))))
+        nil))))
 
 (defun helm-gtags-base-directory ()
   ;; (message helm-gtags-local-directory)
@@ -288,7 +287,9 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (setq end (point))
           ;; (put-text-property begin end 'default-directory default-directory)
           ))
-      (setq helm-gtags-files-cache (cons default-tag-dir (buffer-string))))))
+      (when default-tag-dir
+        (setq helm-gtags-files-cache (cons default-tag-dir (buffer-string)))
+        ))))
 
 ;; (defun helm-gtags-exec-global-command-init (type &optional input)
 ;;   (let (cmd-options
@@ -510,11 +511,14 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-gtags-files-init(&optional in)
   ;; (setq helm-gtags-files-cache (cons default-tag-dir candidates))
-  (let ((input (or in (car (helm-mp-split-pattern helm-pattern))))
-        (buf-filename (buffer-file-name (current-buffer)))
+  (let ((buf-filename (buffer-file-name (current-buffer)))
         (tag-rootdir (car helm-gtags-files-cache)))
-    (if (and helm-gtags-files-cache buf-filename
-             (string-match (regexp-quote tag-rootdir) (file-truename buf-filename)))
+    (if
+        (and helm-gtags-files-cache
+             (or (null tag-rootdir)
+                 (null buf-filename)
+                 (string-match (regexp-quote tag-rootdir)
+                               (file-truename buf-filename))))
         ;; if current buffer file share the same parent directory with tag root directory,
         ;; then use cache
         (progn
@@ -522,7 +526,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (with-current-buffer (helm-candidate-buffer 'global)
             (insert (cdr helm-gtags-files-cache))))
       (helm-gtags-exec-global-command-init-files
-       :file (or in (car (helm-mp-split-pattern helm-pattern))))
+       :file (or in ""))
       )))
 
 (defvar helm-source-gtags-tags
@@ -679,8 +683,12 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (4 (let ((dir (read-directory-name "Input Directory: ")))
          (setq helm-gtags-local-directory (file-name-as-directory (file-truename dir)))))
     (16 (file-name-directory (file-truename (buffer-file-name))))
-    (t (file-name-directory (helm-gtags-find-tag-directory)))
-    ))
+    (t
+     (let ((dir (helm-gtags-find-tag-directory)))
+       (if dir
+           (file-name-directory dir)
+         nil
+         )))))
 
 (defsubst helm-gtags--using-other-window-p ()
   (< (prefix-numeric-value current-prefix-arg) 0))
@@ -816,7 +824,7 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   "Update TAG file. Update All files with `C-u' prefix,
 Generate new TAG file in selected directory with `C-uC-u'"
   (interactive)
-  (when (and (not (get-buffer " *helm-gtags-update TAGS*")) ;not already running
+  (when (and (not (get-buffer helm-gtags-update-tmp-buf)) ;not already running
              (or (called-interactively-p 'interactive) ;call interactively
                  (and (buffer-file-name)                    ;update current file
                       (or (null helm-gtags-delay-seconds)   ;nil means update immidiately
@@ -828,15 +836,15 @@ Generate new TAG file in selected directory with `C-uC-u'"
            (cmd (car cmd-and-params))
            (params (cdr cmd-and-params))
            (proc (apply 'start-process ;;
-                        "helm-gtags-update TAGS" " *helm-gtags-update TAGS*"
+                        "helm-gtags-update TAGS" helm-gtags-update-tmp-buf
                         cmd params)))
       (set-process-query-on-exit-flag proc nil) ;neednot query when quit emacs
       (setq helm-gtags-last-update-time (float-time (current-time)));;update time
       (unless proc (message "Failed to update GNU Global TAGS" )
-              (kill-buffer " *helm-gtags-update TAGS*"))
+              (kill-buffer helm-gtags-update-tmp-buf))
       (set-process-sentinel proc '(lambda(process state)
                                     (when (eq (process-status process) 'exit)
-                                      (kill-buffer " *helm-gtags-update TAGS*")
+                                      (kill-buffer helm-gtags-update-tmp-buf)
                                       (if (zerop (process-exit-status process))
                                           (message "Update GNU Global TAGS successfully")
                                         ;; (message "Failed2 to update GNU Global TAGS")
