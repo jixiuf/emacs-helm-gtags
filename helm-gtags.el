@@ -798,7 +798,7 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   (interactive)
   (setq helm-gtags-context-stack nil))
 
-(defsubst helm-gtags--update-tags-command ( &optional current-prefix-arg)
+(defsubst helm-gtags--update-tags-params ( &optional current-prefix-arg)
   (case (prefix-numeric-value current-prefix-arg)
     (4                                  ;C-u
      (cons helm-gtags-global-command  (list "-u")))
@@ -810,14 +810,10 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
             (tagdir-without-slash-appended (substring tagdir-with-slash 0 (1- len-of-tagdir))))
        ;; on windows "gtags  d:/.emacs.d"  works , but "gtags d:/.emacs.d/" doesn't
        (cons helm-gtags-gtags-command
-             (list tagdir-without-slash-appended))
-       )
-     )
+             (list tagdir-without-slash-appended))))
     (t
      (cons helm-gtags-global-command
-           (list "-u" (format "--single-update=%s" (file-truename (buffer-file-name)))))
-     )
-    ))
+           (list "-u" (format "--single-update=%s" (file-truename (buffer-file-name))))))))
 
 ;;;###autoload
 (defun helm-gtags-update-tags ()
@@ -825,14 +821,14 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
 Generate new TAG file in selected directory with `C-uC-u'"
   (interactive)
   (when (and (not (get-buffer helm-gtags-update-tmp-buf)) ;not already running
-             (or (called-interactively-p 'interactive) ;call interactively
+             (or (called-interactively-p 'interactive) ;if call interactively, update immidiately
                  (and (buffer-file-name)                    ;update current file
                       (or (null helm-gtags-delay-seconds)   ;nil means update immidiately
                           (> (- (float-time (current-time)) ;
                                 helm-gtags-last-update-time)
                              helm-gtags-delay-seconds))
                       )))
-    (let* ((cmd-and-params (helm-gtags--update-tags-command current-prefix-arg))
+    (let* ((cmd-and-params (helm-gtags--update-tags-params current-prefix-arg))
            (cmd (car cmd-and-params))
            (params (cdr cmd-and-params))
            (proc (apply 'start-process ;;
@@ -842,14 +838,15 @@ Generate new TAG file in selected directory with `C-uC-u'"
       (setq helm-gtags-last-update-time (float-time (current-time)));;update time
       (unless proc (message "Failed to update GNU Global TAGS" )
               (kill-buffer helm-gtags-update-tmp-buf))
-      (set-process-sentinel proc '(lambda(process state)
-                                    (when (eq (process-status process) 'exit)
-                                      (kill-buffer helm-gtags-update-tmp-buf)
-                                      (if (zerop (process-exit-status process))
-                                          (message "Update GNU Global TAGS successfully")
-                                        ;; (message "Failed2 to update GNU Global TAGS")
-                                        )
-                                      ))))))
+      (set-process-sentinel proc 'helm-gtags--update-tags-sentinel))))
+
+(defun helm-gtags--update-tags-sentinel (process state)
+  (when (eq (process-status process) 'exit)
+    (kill-buffer helm-gtags-update-tmp-buf)
+    (if (zerop (process-exit-status process))
+        (message "Update TAGS successfully")
+      (message "Failed to update TAGS"))))
+
 
 (defvar helm-gtags-mode-name " HGtags")
 (defvar helm-gtags-mode-map (make-sparse-keymap))
