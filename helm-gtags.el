@@ -153,9 +153,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (helm-declare-obsolete-variable
  'helm-c-gtags-read-only 'helm-gtags-read-only "0.8")
 
-(defun helm-gtags-construct-completion-command-options (type input)
-  (append (helm-gtags-construct-option type t) (list input)))
-
 (defun helm-source-gtags-complete-init()
   (let ((dirs (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source)))
         (default-tag-dir (helm-gtags-searched-directory))
