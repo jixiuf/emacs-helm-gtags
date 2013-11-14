@@ -107,7 +107,7 @@
   :type 'string
   :group 'helm-gtags)
 
-(defcustom helm-gtags-delay-seconds  (* 1 60) ; 1mins,update tag every min
+(defcustom helm-gtags-interval-seconds  (* 1 60) ; 1mins,update tag every min
   "in `after-save-hook' current-time - last-time must bigger than this value,
 then `helm-gtags-update-tags' will be called,nil means update immidiately"
   :type 'integer
@@ -822,10 +822,10 @@ Generate new TAG file in selected directory with `C-uC-u'"
   (when (and (not (get-buffer helm-gtags-update-tmp-buf)) ;not already running
              (or (called-interactively-p 'interactive) ;if call interactively, update immidiately
                  (and (buffer-file-name)                    ;update current file
-                      (or (null helm-gtags-delay-seconds)   ;nil means update immidiately
+                      (or (null helm-gtags-interval-seconds)   ;nil means update immidiately
                           (> (- (float-time (current-time)) ;
                                 helm-gtags-last-update-time)
-                             helm-gtags-delay-seconds))
+                             helm-gtags-interval-seconds))
                       )))
     (let* ((cmd-and-params (helm-gtags--update-tags-params current-prefix-arg))
            (cmd (car cmd-and-params))
