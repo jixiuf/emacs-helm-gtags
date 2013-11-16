@@ -151,7 +151,15 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   '((:tag    . " *helm-gtags-tags*")
     (:rtag   . " *helm-gtags-rtags*")
     (:symbol . " *helm-gtags-symbol*")
-    (:file   . " *helm-gtags-files*")))
+    (:file   . " *helm-gtags-files*")
+    (:tag-here   . " *helm-gtags-tags-here*")
+    (:parse-file   . " *helm-gtags-tags-parse-file*")))
+
+(defvar helm-gtags-command-option-alist
+  '((:tag    . "")
+    (:rtag   . "-r")
+    (:symbol . "-s")
+    (:file   . "-Poa")))
 
 (defmacro helm-declare-obsolete-variable (old new version)
   `(progn
@@ -264,13 +272,13 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
       (find-file-read-only-other-window file)
     (find-file-other-window file)))
 
-(defun helm-gtags-exec-global-command(type &optional input)
-  (let (cmd-options candidates
-                    (candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
-                    (cache (assoc-default type helm-gtags-cache-alist))
-                    (dirs (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source)))
-                    (default-tag-dir (helm-gtags-searched-directory))
-                    (buf-coding buffer-file-coding-system))
+(defun helm-gtags-exec-global-cmd(type &optional input)
+  (let (cmd-options
+        (candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
+        (cache (assoc-default type helm-gtags-cache-alist))
+        (dirs (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source)))
+        (default-tag-dir (helm-gtags-searched-directory))
+        (buf-coding buffer-file-coding-system))
     (when default-tag-dir (add-to-list 'dirs default-tag-dir))
     (with-current-buffer candidates-buf
       (erase-buffer)
@@ -290,31 +298,27 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) input)))))
     candidates-buf))
 
-(defun helm-gtags-find-tag-from-here-candidates()
-  (let (candidates
+(defun helm-gtags-find-tag-from-here-cands-cmd()
+  (let ((candidates-buf (get-buffer-create (assoc-default :tag-here helm-gtags-buf-alist)))
         token from-here
-        ;; (dirs (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source)))
-        (default-directory (helm-gtags-searched-directory)) ;
-        (buf-filename  (file-truename (buffer-file-name helm-current-buffer))))
+        (dir default-directory)
+        (buf-filename (file-truename (buffer-file-name helm-current-buffer))))
     (setq helm-gtags-local-directory nil)
-    (helm-gtags-save-current-context)
-    (with-temp-buffer
-      (with-current-buffer helm-current-buffer
-        (setq token (thing-at-point 'symbol))
-        (setq from-here (format "--from-here=%d:%s" (line-number-at-pos) buf-filename))
-        )
-      (goto-char (point-max))
+    (with-current-buffer helm-current-buffer
+      (helm-gtags-save-current-context)
+      (setq token (or (thing-at-point 'symbol) ""))
+      (setq from-here (format "--from-here=%d:%s" (line-number-at-pos) buf-filename))
+      )
+    (with-current-buffer candidates-buf
+      (setq default-directory dir)
+      (erase-buffer)
       (call-process helm-gtags-global-cmd nil (current-buffer) nil
-                    "--result=grep" from-here token)
-      (setq candidates (helm-gtags-read-buf-lines (current-buffer) helm-gtags-default-candidate-limit)))
-    candidates))
+                    "--result=grep" from-here token))
+    candidates-buf))
 
-
-(defvar helm-gtags-command-option-alist
-  '((:tag    . "")
-    (:rtag   . "-r")
-    (:symbol . "-s")
-    (:file   . "-Poa")))
+(defun helm-gtags-candidates-in-buffer-tag-from-here()
+  (helm-gtags-candidates-in-buffer
+   (helm-gtags-find-tag-from-here-cands-cmd)))
 
 (defun helm-gtags-construct-option (type &optional comp)
   (let ((type-opt (assoc-default type helm-gtags-command-option-alist))
@@ -336,16 +340,22 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
       (error "Input is empty!!"))
     (append option (list input))))
 
-(defun helm-gtags-parse-file-candidates ()
-  (let* ((filename (with-current-buffer helm-current-buffer (file-relative-name helm-gtags-parsed-file )))
-         candidates)
-    (with-temp-buffer
-      (if (zerop (call-process helm-gtags-global-cmd nil (current-buffer) nil
-                               "--result" "cscope" "-f" filename))
-          (setq candidates (helm-gtags-read-buf-lines (current-buffer)
-                                                helm-gtags-default-candidate-limit))
-        (error "Failed: global --result cscope -f \"%s\"" filename)))
-    candidates))
+
+(defun helm-gtags-candidates-in-buffer-parse-file()
+  (helm-gtags-candidates-in-buffer
+   (helm-gtags-parse-file-cmd)))
+
+(defun helm-gtags-parse-file-cmd()
+  (let ((candidates-buf (get-buffer-create (assoc-default :parse-file helm-gtags-buf-alist)))
+        (dir default-directory))
+    (with-current-buffer helm-current-buffer (helm-gtags-save-current-context))
+    (with-current-buffer candidates-buf
+      (erase-buffer)
+      (setq default-directory dir)
+      (unless (zerop (call-process helm-gtags-global-cmd nil (current-buffer) nil
+                                   "--result" "cscope" "-f" helm-gtags-parsed-file))
+        (error "Failed: global --result cscope -f \"%s\"" helm-gtags-parsed-file)))
+    candidates-buf))
 
 (defun helm-gtags-push-context (context)
   (unless(member context helm-gtags-context-stack)
@@ -415,8 +425,10 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
      (let ((buf-filename (buffer-file-name (current-buffer))))
        (or (null buf-filename)
            (and cache
-                (some '(lambda (dir) (string-match (regexp-quote dir)
-                                                   (file-truename buf-filename)))cache)))))
+                (some
+                 '(lambda (dir)
+                    (string-match (regexp-quote dir)
+                                  (file-truename buf-filename)))cache)))))
     (otherwise
      (string-equal input cache))))
 
@@ -428,7 +440,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (if (and cache (bufferp candidates-buf)(buffer-live-p candidates-buf)
              (helm-gtags-use-cache-p type input cache))
         candidates-buf
-      (helm-gtags-exec-global-command type input))))
+      (helm-gtags-exec-global-cmd type input))))
 
 (defun helm-gtags-candidates-in-buffer-rtag(&optional in)
   (helm-gtags-candidates-in-buffer
@@ -508,17 +520,17 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (type . file)))
 
 (defvar helm-source-gtags-find-tag-from-here
-  '((name . "tags")
-    (candidates . helm-gtags-find-tag-from-here-candidates)
-    ;; (volatile) ;;candidates
+  `((name . "tags")
+    (candidates-in-buffer . helm-gtags-candidates-in-buffer-tag-from-here)
+    (get-line . buffer-substring)
     (persistent-action . helm-gtags-tags-persistent-action)
+    (candidate-number-limit . ,helm-gtags-default-candidate-limit)
     (action . helm-gtags-action-openfile)))
 
 (defvar helm-source-gtags-parse-file
   `((name . "GNU GLOBAL Parsed File")
-    (candidates . helm-gtags-parse-file-candidates)
-    ;; (candidates-in-buffer)
-    ;; (get-line . buffer-substring)
+    (candidates-in-buffer . helm-gtags-candidates-in-buffer-parse-file)
+    (get-line . buffer-substring-no-properties)
     (real-to-display . helm-gtags-parse-file-candidate-transformer)
     (action . helm-gtags-parse-file-action)
     (candidate-number-limit . ,helm-gtags-default-candidate-limit)))
@@ -676,7 +688,7 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   (helm-gtags-common '(helm-source-gtags-files) ""))
 
 ;;;###autoload
-(defun helm-gtags-find-tag-from-here ()
+(defun helm-gtags-find-tag-from-here()
   "Find from here with gnu global"
   (interactive)
   (helm-gtags-common '(helm-source-gtags-find-tag-from-here)))
