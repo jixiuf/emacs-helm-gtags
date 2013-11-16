@@ -483,10 +483,9 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (action . helm-gtags-action-openfile)))
 
 (defun helm-gtags-files-candidate-transformer (file)
-  (let ((removed-regexp (format "^%s"
-                                (with-current-buffer
-                                    helm-current-buffer
-                                  (helm-gtags-searched-directory t)))))
+  (let ((removed-regexp
+         (format "^%s" (with-current-buffer helm-current-buffer
+                         (regexp-quote (helm-gtags-searched-directory t))))))
     (replace-regexp-in-string removed-regexp "" file)))
 
 (defun helm-gtags-parse-file-candidate-transformer (file)
