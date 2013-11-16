@@ -273,6 +273,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
                     (buf-coding buffer-file-coding-system))
     (when default-tag-dir (add-to-list 'dirs default-tag-dir))
     (with-current-buffer candidates-buf
+      (erase-buffer)
       (let (begin end (default-directory default-directory)
                   (coding-system-for-read buf-coding)
                   (coding-system-for-write buf-coding))
@@ -285,8 +286,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (setq end (point))
           (put-text-property begin end 'default-directory default-directory))
         (case type
-          (:file (setq cache dirs))
-          (otherwise (setq cache input)))))
+          (:file  (setf (cdr (assoc type helm-gtags-cache-alist)) dirs))
+          (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) input)))))
     candidates-buf))
 
 (defun helm-gtags-find-tag-from-here-candidates()
@@ -409,13 +410,13 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (helm-match-line-color-current-line)))
 
 (defun helm-gtags-use-cache-p(type input cache)
-  (case
-      (:file
-       (let ((buf-filename (buffer-file-name (current-buffer))))
-         (or (null buf-filename)
-             (and cache
-                  (some '(lambda (dir) (string-match (regexp-quote dir)
-                                                     (file-truename buf-filename)))cache)))))
+  (case type
+    (:file
+     (let ((buf-filename (buffer-file-name (current-buffer))))
+       (or (null buf-filename)
+           (and cache
+                (some '(lambda (dir) (string-match (regexp-quote dir)
+                                                   (file-truename buf-filename)))cache)))))
     (otherwise
      (string-equal input cache))))
 
@@ -424,7 +425,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (candidates-buf (get-buffer (assoc-default type helm-gtags-buf-alist)))
         (cache (assoc-default type helm-gtags-cache-alist)))
     (with-current-buffer helm-current-buffer (helm-gtags-save-current-context))
-    (if (and cache (bufferp candidates-buf) (helm-gtags-use-cache-p type input cache))
+    (if (and cache (bufferp candidates-buf)(buffer-live-p candidates-buf)
+             (helm-gtags-use-cache-p type input cache))
         candidates-buf
       (helm-gtags-exec-global-command type input))))
 
