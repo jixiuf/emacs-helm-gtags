@@ -186,7 +186,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (let((buf-filename (buffer-file-name))
        (i 0) tagroot dir found)
     (if (null buf-filename)
-        default-directory
+        (file-truename (expand-file-name default-directory))
       (while (and (< i (length helm-gtags-tag-location-list))
                   (null tagroot))
         (setq dir (nth i helm-gtags-tag-location-list))
@@ -194,8 +194,9 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (setq tagroot dir))
         (setq i (1+ i)))
       (if tagroot tagroot
-        (if nosearch default-directory
-          (or (helm-gtags-find-tag-directory) default-directory))))))
+        (if nosearch (file-truename (expand-file-name default-directory))
+          (or (helm-gtags-find-tag-directory)
+              (file-truename (expand-file-name default-directory))))))))
 
 (defun helm-source-gtags-complete-init()
   (let ((dirs (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source)))
