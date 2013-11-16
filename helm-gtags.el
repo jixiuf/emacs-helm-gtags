@@ -369,8 +369,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-gtags-action-openfile (_elm)
   (let* ((elm (helm-get-selection nil 'withprop))
-         (elems (split-string elm ":"))
-         (filename (first elems))
+         (elems (helm-gtags-split-line elm))
+         (filename (or (get-text-property 0 'filename elm) (first elems)))
          (line (string-to-number (second elems)))
          (open-func (helm-gtags-select-find-file-func))
          (default-directory (or (get-text-property 0 'default-directory elm) (helm-gtags-base-directory))))
@@ -380,15 +380,17 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (with-current-buffer (find-file-noselect file)
     (save-excursion
       (goto-char pos)
-      (let ((curfunc (which-function))
-            (line (line-number-at-pos))
-            (content (or (buffer-substring
-                          (line-beginning-position) (line-end-position))
-                         "")))
-        (format "%s:%d%s:%s\n"
-                file line
-                (helm-aif curfunc (format "[%s]" it) "")
-                content)))))
+      (let* ((curfunc (which-function))
+             (line (line-number-at-pos))
+             (content (or (buffer-substring
+                           (line-beginning-position) (line-end-position))
+                          ""))
+             (format-line (format "%s:%d%s:%s\n"
+                                  file line
+                                  (helm-aif curfunc (format "[%s]" it) "")
+                                  content)))
+        (put-text-property 0 (length format-line) 'filename file format-line)
+        format-line))))
 
 (defun helm-gtags-show-stack-init ()
   (with-current-buffer (helm-candidate-buffer 'global)
@@ -398,9 +400,21 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           do
           (insert (helm-gtags-file-content-at-pos file pos)))))
 
+(defun helm-gtags-split-line (line)
+  "Split a output line."
+  ;; The output of grep may send a truncated line in this chunk,
+  ;; so don't split until grep line is valid, that is
+  ;; once the second part of the line comes with next chunk
+  ;; send by process.
+  (when (string-match "^\\([a-zA-Z]?:?.*?\\):\\([0-9]+\\)" line)
+    ;; Don't use split-string because buffer/file name or string
+    ;; may contain a ":".
+    (loop for n from 1 to 3 collect (match-string n line))))
+
 (defun helm-gtags-tags-persistent-action (_cand)
-  (let* ((elems (split-string (helm-get-selection nil 'withprop) ":"))
-         (filename (first elems))
+  (let* ((c (helm-get-selection nil 'withprop))
+         (elems (helm-gtags-split-line c))
+         (filename (or (get-text-property 0 'filename c) (first elems)))
          (line (string-to-number (second elems)))
          (default-directory (helm-gtags-base-directory)))
     (find-file filename)
