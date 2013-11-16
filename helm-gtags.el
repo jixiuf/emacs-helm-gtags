@@ -116,7 +116,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defvar helm-gtags-last-update-time (float-time (current-time))
   "`global -u --single-update'")
 
-
 (defvar helm-gtags-tag-location nil
   "GNU global tag `GTAGS' location")
 
@@ -135,6 +134,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defvar helm-gtags-local-directory nil)
 (defvar helm-gtags-parsed-file nil)
 
+(defvar helm-gtags-update-tmp-buf " *helm-gtags-update TAGS*")
+
 (defvar helm-gtags-tag-cache nil)
 (defvar helm-gtags-rtag-cache nil)
 (defvar helm-gtags-symbol-cache nil)
@@ -142,23 +143,15 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defvar helm-gtags-cache-alist
   `((:tag    . ,helm-gtags-tag-cache)
-    (:rtag   . helm-gtags-rtag-cache)
+    (:rtag   . ,helm-gtags-rtag-cache)
     (:symbol . ,helm-gtags-symbol-cache)
     (:file   . ,helm-gtags-file-cache)))
 
-(defvar helm-gtags-update-tmp-buf " *helm-gtags-update TAGS*")
-
-(defvar helm-gtags-tmp-tag-buf " *helm-gtags-tags*")
-(defvar helm-gtags-tmp-rtag-buf " *helm-gtags-rtags*")
-(defvar helm-gtags-tmp-files-buf " *helm-gtags-files*")
-(defvar helm-gtags-tmp-symbol-buf " *helm-gtags-symbol*")
-
 (defvar helm-gtags-buf-alist
-  `((:tag    . ,helm-gtags-tmp-tag-buf)
-    (:rtag   . ,helm-gtags-tmp-rtag-buf)
-    (:symbol . ,helm-gtags-tmp-symbol-buf)
-    (:file   . ,helm-gtags-tmp-files-buf)))
-
+  '((:tag    . " *helm-gtags-tags*")
+    (:rtag   . " *helm-gtags-rtags*")
+    (:symbol . " *helm-gtags-symbol*")
+    (:file   . " *helm-gtags-files*")))
 
 (defmacro helm-declare-obsolete-variable (old new version)
   `(progn
