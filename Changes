@@ -3,8 +3,8 @@ Revision history for helm-gtags.el
 Revision 2.0 2013/11/10 纪秀峰
   totally rewrite
   highlight:
-  1. add helm-gtags-tag-location-list option,
-     support multiply tag locations.
+  1. add helm-gtags-tag-location-alist option,
+     support multiply tag locations for diffient modes.
   2. replace all call-process-shell-command with call-process
   3. add function helm-gtags-complete
      help completing symbol at point when writing code.
