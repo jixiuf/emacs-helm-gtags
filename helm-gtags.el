@@ -90,7 +90,6 @@
   "tag locations."
   :type 'list
   :group 'helm-gtags)
-;; (make-variable-buffer-local 'helm-gtags-tag-location-list)
 
 (defcustom helm-gtags-default-candidate-limit 1000
   "default candidate limit."
@@ -124,7 +123,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (:symbol . "Find Symbol: ")
     (:file   . "Find File: ")))
 
-(defvar helm-gtags-completing-history nil)
 (defvar helm-gtags-context-stack nil)
 (defvar helm-gtags-saved-context nil)
 (defvar helm-gtags-use-otherwin nil)
@@ -383,14 +381,11 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-gtags-split-line (line)
   "Split a output line."
-  ;; The output of grep may send a truncated line in this chunk,
-  ;; so don't split until grep line is valid, that is
-  ;; once the second part of the line comes with next chunk
-  ;; send by process.
   (when (string-match "^\\([a-zA-Z]?:?.*?\\):\\([0-9]+\\)" line)
     ;; Don't use split-string because buffer/file name or string
     ;; may contain a ":".
     (loop for n from 1 to 3 collect (match-string n line))))
+
 
 (defun helm-gtags-tags-persistent-action (_cand)
   (let* ((c (helm-get-selection nil 'withprop))
