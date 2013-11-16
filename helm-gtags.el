@@ -251,7 +251,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (let (cmd-options
         (candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
         (cache (assoc-default type helm-gtags-cache-alist))
-        (dirs (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source)))
+        (dirs (or (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source))
+                  helm-gtags-tag-location-list))
         (buf-coding buffer-file-coding-system))
     (with-current-buffer candidates-buf
       (erase-buffer)
