@@ -500,7 +500,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   `((name . "gnu global files")
     (candidates-in-buffer . helm-gtags-candidates-in-buffer-file)
     (get-line . buffer-substring-no-properties)
-    (real-to-display . helm-gtags-files-candidate-transformer)
+    ;; (real-to-display . helm-gtags-files-candidate-transformer)
     (candidate-number-limit . ,helm-gtags-default-candidate-limit)
     (type . file)))
 
