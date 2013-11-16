@@ -216,7 +216,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-gtags-complete-insert-action(cand)
   "insert candidate at point"
-  (helm-gtags-delete-current-symbol)
+  (helm-gtags-delete-cur-symbol)
   (insert cand))
 
 ;;;###autoload
@@ -226,7 +226,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (helm-gtags-common '(helm-source-gtags-complete)
                      (helm-gtags-token-at-point)))
 
-(defun helm-gtags-delete-current-symbol()
+(defun helm-gtags-delete-cur-symbol()
   (let ((bound (bounds-of-thing-at-point 'symbol)))
     (if bound
         (delete-region (car bound) (cdr bound))
@@ -237,7 +237,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (if bound
         (buffer-substring-no-properties (car bound) (point))
       "")))
-
 
 (defun helm-gtags-save-current-context ()
   (let ((file (buffer-file-name (current-buffer))))
@@ -273,7 +272,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
                     (default-tag-dir (helm-gtags-searched-directory))
                     (buf-coding buffer-file-coding-system))
     (when default-tag-dir (add-to-list 'dirs default-tag-dir))
-    ;; (with-current-buffer helm-current-buffer (helm-gtags-save-current-context))
     (with-current-buffer candidates-buf
       (let (begin end (default-directory default-directory)
                   (coding-system-for-read buf-coding)
