@@ -173,17 +173,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (helm-declare-obsolete-variable
  'helm-c-gtags-read-only 'helm-gtags-read-only "0.8")
 
-(defun helm-gtags-read-buf-lines(buf limit)
-  (with-current-buffer buf
-    (goto-char (point-min))
-    (let (candidates (i 0) line )
-      (while (or (and (not (eobp)) (null limit)) (and limit (< i limit)))
-        (setq line  (buffer-substring (line-beginning-position) (line-end-position)))
-        (unless (string= "" line ) (add-to-list 'candidates line))
-        (forward-line)
-        (setq i (1+ i)))
-      candidates)))
-
 (defsubst helm-gtags-type-is-not-file-p (type)
   (not (eq type :file)))
 
