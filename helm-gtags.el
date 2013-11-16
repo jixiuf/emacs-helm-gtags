@@ -182,7 +182,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
             tag-location
             )nil))))
 
-(defun helm-gtags-searched-directory()
+(defun helm-gtags-searched-directory(&optional nosearch)
   (let((buf-filename (buffer-file-name))
        (i 0) tagroot dir found)
     (if (null buf-filename)
@@ -194,7 +194,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (setq tagroot dir))
         (setq i (1+ i)))
       (if tagroot tagroot
-        (or (helm-gtags-find-tag-directory) default-directory)))))
+        (if nosearch default-directory
+          (or (helm-gtags-find-tag-directory) default-directory))))))
 
 (defun helm-source-gtags-complete-init()
   (let ((dirs (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source)))
@@ -484,8 +485,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (let ((removed-regexp (format "^%s"
                                 (with-current-buffer
                                     helm-current-buffer
-                                  (helm-gtags-searched-directory)))))
-    (print removed-regexp)
+                                  (helm-gtags-searched-directory t)))))
     (replace-regexp-in-string removed-regexp "" file)))
 
 (defun helm-gtags-parse-file-candidate-transformer (file)
