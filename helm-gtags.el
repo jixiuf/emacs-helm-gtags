@@ -177,6 +177,17 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (setf (cdr (assoc key  helm-gtags-tag-location-alist)) value)
       (add-to-list 'helm-gtags-tag-location-alist `(,key . ,value)))))
 
+(defun helm-gtags-delete-cur-symbol()
+  (let ((bound (bounds-of-thing-at-point 'symbol)))
+    (if bound
+        (delete-region (car bound) (cdr bound)))))
+
+(defun helm-gtags-token-at-point ()
+  (let ((bound (bounds-of-thing-at-point 'symbol)))
+    (if bound (buffer-substring-no-properties
+               (car bound) (point))
+      "")))
+
 (defsubst helm-gtags-type-is-not-file-p (type)
   (not (eq type :file)))
 
@@ -249,60 +260,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (helm-gtags-common '(helm-source-gtags-complete)
                      (helm-gtags-token-at-point)))
 
-(defun helm-gtags-delete-cur-symbol()
-  (let ((bound (bounds-of-thing-at-point 'symbol)))
-    (if bound
-        (delete-region (car bound) (cdr bound)))))
-
-(defun helm-gtags-token-at-point ()
-  (let ((bound (bounds-of-thing-at-point 'symbol)))
-    (if bound (buffer-substring-no-properties
-               (car bound) (point))
-      "")))
-
-(defun helm-gtags-open-file (file readonly)
-  (if readonly
-      (find-file-read-only file)
-    (find-file file)))
-
-(defun helm-gtags-open-file-other-window (file readonly)
-  (setq helm-gtags-use-otherwin nil)
-  (if readonly
-      (find-file-read-only-other-window file)
-    (find-file-other-window file)))
-
-(defun helm-gtags-exec-global-cmd(type &optional input)
-  (let ((candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
-        ;; (cache-info (assoc-default type helm-gtags-cache-alist))
-        (buf-coding buffer-file-coding-system)
-        cmd-options dirs dir)
-    (with-current-buffer helm-current-buffer
-      (setq dir (helm-gtags-searched-directory nil nil))
-      (setq dirs (mapcar (lambda(tmp-dir) (file-name-as-directory (file-truename (expand-file-name tmp-dir))))
-                         (assoc-default major-mode helm-gtags-tag-location-alist)))
-      (when dir (add-to-list 'dirs dir))
-      (helm-gtags-set-tag-location-alist major-mode dirs)
-      (case type
-        (:file  (setf (cdr (assoc type helm-gtags-cache-alist)) (cons major-mode dirs)))
-        (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) (cons major-mode input)))))
-
-    (with-current-buffer candidates-buf
-      (erase-buffer)
-      (let (begin end (default-directory default-directory)
-                  (coding-system-for-read buf-coding)
-                  (coding-system-for-write buf-coding))
-        (dolist (dir dirs)
-          (setq cmd-options (helm-gtags-construct-command type dir input))
-          (setq default-directory dir)
-          (goto-char (point-max))
-          (setq begin (point))
-          (if (zerop (apply 'call-process helm-gtags-global-cmd nil (current-buffer) nil cmd-options))
-              (progn
-                (setq end (point))
-                (put-text-property begin end 'default-directory default-directory))
-            (error "Error:%s"  (buffer-substring-no-properties begin (point)))
-            (delete-region begin (point))))))
-    candidates-buf))
 
 (defun helm-gtags-find-tag-from-here-cands-cmd()
   (let ((candidates-buf (get-buffer-create (assoc-default :tag-here helm-gtags-buf-alist)))
@@ -358,21 +315,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (error "Failed: global --result cscope -f \"%s\"" helm-gtags-parsed-file)))
     candidates-buf))
 
-(defun helm-gtags-push-context (context)
-  (unless(member context helm-gtags-context-stack)
-    (push  context helm-gtags-context-stack)))
-
-(defun helm-gtags-select-find-file-func()
-  (if helm-gtags-use-otherwin
-      'helm-gtags-open-file-other-window
-    'helm-gtags-open-file))
-
-(defun helm-gtags-do-open-file (open-func file line)
-  (funcall open-func file helm-gtags-read-only)
-  (goto-char (point-min))
-  (forward-line (1- line))
-  (helm-gtags-push-context helm-gtags-saved-context))
-
 (defun helm-gtags-parse-file-action (cand)
   (let ((line (when (string-match "\\s-+\\([1-9][0-9]*\\)\\s-+" cand)
                 (string-to-number (match-string 1 cand))))
@@ -387,6 +329,31 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
          (open-func (helm-gtags-select-find-file-func))
          (default-directory (or (get-text-property 0 'default-directory elm) (helm-gtags-searched-directory))))
     (helm-gtags-do-open-file open-func filename line)))
+
+(defun helm-gtags-select-find-file-func()
+  (if helm-gtags-use-otherwin
+      'helm-gtags-open-file-other-window
+    'helm-gtags-open-file))
+
+(defun helm-gtags-do-open-file (open-func file line)
+  (funcall open-func file helm-gtags-read-only)
+  (goto-char (point-min))
+  (forward-line (1- line))
+  (helm-gtags-push-context helm-gtags-saved-context))
+
+(defun helm-gtags-open-file (file readonly)
+  (if readonly
+      (find-file-read-only file)
+    (find-file file)))
+
+(defsubst helm-gtags--using-other-window-p ()
+  (< (prefix-numeric-value current-prefix-arg) 0))
+
+(defun helm-gtags-open-file-other-window (file readonly)
+  (setq helm-gtags-use-otherwin nil)
+  (if readonly
+      (find-file-read-only-other-window file)
+    (find-file-other-window file)))
 
 (defun helm-gtags-file-content-at-pos (file pos)
   (with-current-buffer (find-file-noselect file)
@@ -404,14 +371,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (put-text-property 0 (length format-line) 'filename file format-line)
         format-line))))
 
-(defun helm-gtags-show-stack-init ()
-  (with-current-buffer (helm-candidate-buffer 'global)
-    (loop for context in (reverse helm-gtags-context-stack)
-          for file = (plist-get context :file)
-          for pos  = (plist-get context :position)
-          do
-          (insert (helm-gtags-file-content-at-pos file pos)))))
-
 (defun helm-gtags-split-line (line)
   "Split a output line."
   (when (string-match "^\\([a-zA-Z]?:?.*?\\):\\([0-9]+\\)" line)
@@ -419,6 +378,27 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     ;; may contain a ":".
     (loop for n from 1 to 3 collect (match-string n line))))
 
+(defun helm-gtags-files-candidate-transformer (file)
+  (let ((removed-regexp
+         (format "^%s" (with-current-buffer helm-current-buffer
+                         (regexp-quote (helm-gtags-searched-directory t))))))
+    (replace-regexp-in-string removed-regexp "" file)))
+
+(defun helm-gtags-parse-file-candidate-transformer (file)
+  (let ((removed-file (replace-regexp-in-string "\\`\\S-+ " "" file)))
+    (when (string-match "\\`\\(\\S-+\\) \\(\\S-+\\) \\(.+\\)\\'" removed-file)
+      (format "%-25s %-5s %s"
+              (match-string 1 removed-file)
+              (match-string 2 removed-file)
+              (match-string 3 removed-file)))))
+
+
+(defun helm-gtags-set-parsed-file ()
+  (let* ((this-file (file-name-nondirectory (buffer-file-name)))
+         (file (if current-prefix-arg
+                   (read-file-name "Parsed File: " nil this-file)
+                 this-file)))
+    (setq helm-gtags-parsed-file (file-truename (expand-file-name file)))))
 
 (defun helm-gtags-tags-persistent-action (_cand)
   (let* ((c (helm-get-selection nil 'withprop))
@@ -431,6 +411,84 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (goto-char (point-min))
     (forward-line (1- line))
     (helm-match-line-color-current-line)))
+(defun helm-gtags-save-current-context ()
+  (let ((file (buffer-file-name (current-buffer))))
+    (setq helm-gtags-saved-context
+          (list :file file :position (point) :readonly buffer-file-read-only))))
+
+(defun helm-gtags-push-context (context)
+  (unless(member context helm-gtags-context-stack)
+    (push  context helm-gtags-context-stack)))
+
+(defun helm-gtags-pop-context ()
+  (unless helm-gtags-context-stack
+    (error "Context stack is empty." ))
+  (let* ((context (pop helm-gtags-context-stack))
+         (file (plist-get context :file))
+         (curpoint (plist-get context :position))
+         (readonly (plist-get context :readonly)))
+    (helm-gtags-open-file file readonly)
+    (goto-char curpoint)))
+
+(defun helm-gtags-show-stack-init ()
+  (with-current-buffer (helm-candidate-buffer 'global)
+    (loop for context in (reverse helm-gtags-context-stack)
+          for file = (plist-get context :file)
+          for pos  = (plist-get context :position)
+          do
+          (insert (helm-gtags-file-content-at-pos file pos)))))
+
+(defun helm-gtags-common (srcs &optional input)
+  (let ((helm-quit-if-no-candidate #'(lambda() (message "gtags:not found")))
+        (helm-execute-action-at-once-if-one t)
+        (buf (get-buffer-create helm-gtags-buffer))
+        (custom-dirs (assoc-default major-mode helm-gtags-tag-location-alist))
+        (src (car srcs)))
+    (when (helm-gtags--using-other-window-p) (setq helm-gtags-use-otherwin t))
+    (dolist (src srcs)
+      (when (symbolp src) (setq src (symbol-value src)))
+      (unless (helm-attr 'init-name src) (helm-attrset 'init-name  (helm-attr 'name src) src))
+      (helm-attrset 'name
+                    (format "Searched %s at %s" (or (helm-attr 'init-name src) "")
+                            (mapconcat 'identity custom-dirs "  "))
+                    src))
+    (helm :sources srcs
+          :input (or input (thing-at-point 'symbol))
+          :buffer buf)))
+
+
+(defun helm-gtags-exec-global-cmd(type &optional input)
+  (let ((candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
+        ;; (cache-info (assoc-default type helm-gtags-cache-alist))
+        (buf-coding buffer-file-coding-system)
+        cmd-options dirs dir)
+    (with-current-buffer helm-current-buffer
+      (setq dir (helm-gtags-searched-directory nil nil))
+      (setq dirs (mapcar (lambda(tmp-dir) (file-name-as-directory (file-truename (expand-file-name tmp-dir))))
+                         (assoc-default major-mode helm-gtags-tag-location-alist)))
+      (when dir (add-to-list 'dirs dir))
+      (helm-gtags-set-tag-location-alist major-mode dirs)
+      (case type
+        (:file  (setf (cdr (assoc type helm-gtags-cache-alist)) (cons major-mode dirs)))
+        (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) (cons major-mode input)))))
+
+    (with-current-buffer candidates-buf
+      (erase-buffer)
+      (let (begin end (default-directory default-directory)
+                  (coding-system-for-read buf-coding)
+                  (coding-system-for-write buf-coding))
+        (dolist (dir dirs)
+          (setq cmd-options (helm-gtags-construct-command type dir input))
+          (setq default-directory dir)
+          (goto-char (point-max))
+          (setq begin (point))
+          (if (zerop (apply 'call-process helm-gtags-global-cmd nil (current-buffer) nil cmd-options))
+              (progn
+                (setq end (point))
+                (put-text-property begin end 'default-directory default-directory))
+            (error "Error:%s"  (buffer-substring-no-properties begin (point)))
+            (delete-region begin (point))))))
+    candidates-buf))
 
 (defun helm-gtags-use-cache-p(type input cache-info)
   (with-current-buffer helm-current-buffer
@@ -517,19 +575,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (persistent-action . helm-gtags-tags-persistent-action)
     (action . helm-gtags-action-openfile)))
 
-(defun helm-gtags-files-candidate-transformer (file)
-  (let ((removed-regexp
-         (format "^%s" (with-current-buffer helm-current-buffer
-                         (regexp-quote (helm-gtags-searched-directory t))))))
-    (replace-regexp-in-string removed-regexp "" file)))
-
-(defun helm-gtags-parse-file-candidate-transformer (file)
-  (let ((removed-file (replace-regexp-in-string "\\`\\S-+ " "" file)))
-    (when (string-match "\\`\\(\\S-+\\) \\(\\S-+\\) \\(.+\\)\\'" removed-file)
-      (format "%-25s %-5s %s"
-              (match-string 1 removed-file)
-              (match-string 2 removed-file)
-              (match-string 3 removed-file)))))
 
 (defvar helm-source-gtags-files
   `((name . "gnu global files")
@@ -565,11 +610,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (persistent-action . helm-gtags-tags-persistent-action)
     (action . helm-gtags-action-openfile)))
 
-;;;###autoload
-(defun helm-gtags-select ()
-  (interactive)
-  (helm-gtags-common '(helm-source-gtags-select) "") )
-
 
 (defun helm-source-gtags-select-tag (candidate)
   `((name . "tags")
@@ -578,9 +618,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (get-line . buffer-substring)
     (delayed)
     (persistent-action . helm-gtags-tags-persistent-action)
-    (action . helm-gtags-action-openfile))
-  )
-
+    (action . helm-gtags-action-openfile)))
 
 (defun helm-source-gtags-select-rtag (candidate)
   `((name . "rtags")
@@ -634,27 +672,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
                 helm-source-gtags-select-rtag-action)))))
 
 
-(defsubst helm-gtags--using-other-window-p ()
-  (< (prefix-numeric-value current-prefix-arg) 0))
-
-
-(defun helm-gtags-common (srcs &optional input)
-  (let ((helm-quit-if-no-candidate #'(lambda() (message "gtags:not found")))
-        (helm-execute-action-at-once-if-one t)
-        (buf (get-buffer-create helm-gtags-buffer))
-        (custom-dirs (assoc-default major-mode helm-gtags-tag-location-alist))
-        (src (car srcs)))
-    (when (helm-gtags--using-other-window-p) (setq helm-gtags-use-otherwin t))
-    (dolist (src srcs)
-      (when (symbolp src) (setq src (symbol-value src)))
-      (unless (helm-attr 'init-name src) (helm-attrset 'init-name  (helm-attr 'name src) src))
-      (helm-attrset 'name
-                    (format "Searched %s at %s" (or (helm-attr 'init-name src) "")
-                            (mapconcat 'identity custom-dirs "  "))
-                    src))
-    (helm :sources srcs
-          :input (or input (thing-at-point 'symbol))
-          :buffer buf)))
 
 ;;;###autoload
 (defun helm-gtags-find-tag-and-symbol ()
@@ -689,17 +706,15 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   (helm-gtags-common '(helm-source-gtags-files) ""))
 
 ;;;###autoload
+(defun helm-gtags-select ()
+  (interactive)
+  (helm-gtags-common '(helm-source-gtags-select) "") )
+
+;;;###autoload
 (defun helm-gtags-find-tag-from-here()
   "Find from here with gnu global"
   (interactive)
   (helm-gtags-common '(helm-source-gtags-find-tag-from-here)))
-
-(defun helm-gtags-set-parsed-file ()
-  (let* ((this-file (file-name-nondirectory (buffer-file-name)))
-         (file (if current-prefix-arg
-                   (read-file-name "Parsed File: " nil this-file)
-                 this-file)))
-    (setq helm-gtags-parsed-file (file-truename (expand-file-name file)))))
 
 ;;;###autoload
 (defun helm-gtags-parse-file()
@@ -735,21 +750,6 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   "Clear jumped point stack"
   (interactive)
   (setq helm-gtags-context-stack nil))
-
-(defun helm-gtags-save-current-context ()
-  (let ((file (buffer-file-name (current-buffer))))
-    (setq helm-gtags-saved-context
-          (list :file file :position (point) :readonly buffer-file-read-only))))
-
-(defun helm-gtags-pop-context ()
-  (unless helm-gtags-context-stack
-    (error "Context stack is empty." ))
-  (let* ((context (pop helm-gtags-context-stack))
-         (file (plist-get context :file))
-         (curpoint (plist-get context :position))
-         (readonly (plist-get context :readonly)))
-    (helm-gtags-open-file file readonly)
-    (goto-char curpoint)))
 
 (defsubst helm-gtags--update-tags-params ( &optional current-prefix-arg)
   (case (prefix-numeric-value current-prefix-arg)
