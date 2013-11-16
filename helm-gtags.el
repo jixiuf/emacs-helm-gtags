@@ -97,12 +97,12 @@
   :type 'integer
   :group 'helm-gtags)
 
-(defcustom helm-gtags-global-command "global"
+(defcustom helm-gtags-global-cmd "global"
   "where global command."
   :type 'string
   :group 'helm-gtags)
 
-(defcustom helm-gtags-gtags-command "gtags"
+(defcustom helm-gtags-cmd "gtags"
   "where gtags command."
   :type 'string
   :group 'helm-gtags)
@@ -188,7 +188,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-gtags-find-tag-directory()
   (with-temp-buffer
-    (let ((status (call-process helm-gtags-global-command nil  (current-buffer) nil  "-p")))
+    (let ((status (call-process helm-gtags-global-cmd nil  (current-buffer) nil  "-p")))
       (if (zerop status)
           (let ((tagroot (buffer-substring
                           (goto-char (point-min)) (line-end-position))))
@@ -210,7 +210,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (with-current-buffer (helm-candidate-buffer 'global)
       (dolist (dir dirs)
         (goto-char (point-max))
-        (call-process helm-gtags-global-command nil (current-buffer) nil "-c" prefix)))))
+        (call-process helm-gtags-global-cmd nil (current-buffer) nil "-c" prefix)))))
 
 (defvar helm-source-gtags-complete
   `((name . "GNU GLOBAL complete")
@@ -290,7 +290,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (setq default-directory (helm-gtags-base-directory))
           (goto-char (point-max))
           (setq begin (point))
-          (apply 'call-process helm-gtags-global-command nil (current-buffer) nil cmd-options)
+          (apply 'call-process helm-gtags-global-cmd nil (current-buffer) nil cmd-options)
           (setq end (point))
           (put-text-property begin end 'default-directory default-directory))
         (case type
@@ -312,7 +312,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (setq from-here (format "--from-here=%d:%s" (line-number-at-pos) buf-filename))
         )
       (goto-char (point-max))
-      (call-process helm-gtags-global-command nil (current-buffer) nil
+      (call-process helm-gtags-global-cmd nil (current-buffer) nil
                     "--result=grep" from-here token)
       (setq candidates (helm-gtags-read-buf-lines (current-buffer) helm-gtags-default-candidate-limit)))
     candidates))
@@ -348,7 +348,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (let* ((filename (with-current-buffer helm-current-buffer (file-relative-name helm-gtags-parsed-file )))
          candidates)
     (with-temp-buffer
-      (if (zerop (call-process helm-gtags-global-command nil (current-buffer) nil
+      (if (zerop (call-process helm-gtags-global-cmd nil (current-buffer) nil
                                "--result" "cscope" "-f" filename))
           (setq candidates (helm-gtags-read-buf-lines (current-buffer)
                                                 helm-gtags-default-candidate-limit))
@@ -593,7 +593,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (setq default-directory (helm-gtags-base-directory))
           (goto-char (point-max))
           (setq begin (point))
-          (call-process helm-gtags-global-command nil (current-buffer) nil "-c")
+          (call-process helm-gtags-global-cmd nil (current-buffer) nil "-c")
           ;; (call-process-shell-command cmd nil t)
           (setq end (point))
           (put-text-property begin end 'default-directory default-directory)
@@ -733,7 +733,7 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
 (defsubst helm-gtags--update-tags-params ( &optional current-prefix-arg)
   (case (prefix-numeric-value current-prefix-arg)
     (4                                  ;C-u
-     (cons helm-gtags-global-command  (list "-u")))
+     (cons helm-gtags-global-cmd  (list "-u")))
     (16                                 ;C-uC-u
      (let* ((tagdir-with-slash
              (file-truename (expand-file-name
@@ -741,10 +741,10 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
             (len-of-tagdir (length tagdir-with-slash))
             (tagdir-without-slash-appended (substring tagdir-with-slash 0 (1- len-of-tagdir))))
        ;; on windows "gtags  d:/.emacs.d"  works , but "gtags d:/.emacs.d/" doesn't
-       (cons helm-gtags-gtags-command
+       (cons helm-gtags-cmd
              (list tagdir-without-slash-appended))))
     (t
-     (cons helm-gtags-global-command
+     (cons helm-gtags-global-cmd
            (list "-u" (format "--single-update=%s" (file-truename (buffer-file-name))))))))
 
 ;;;###autoload
