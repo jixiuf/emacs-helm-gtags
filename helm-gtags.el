@@ -212,12 +212,21 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
               (or default (file-truename (expand-file-name default-directory)))))))))
 
 (defun helm-source-gtags-complete-init()
-  (let ((dirs (assoc-default major-mode helm-gtags-tag-location-alist))
-        (prefix (helm-gtags-token-at-point)))
+  (let ((dirs (mapcar (lambda(tmp-dir) (file-name-as-directory (file-truename (expand-file-name tmp-dir))))
+                      (assoc-default major-mode helm-gtags-tag-location-alist)))
+        (dir (helm-gtags-searched-directory nil nil))
+        (prefix (helm-gtags-token-at-point))
+        begin)
+    (when dir (add-to-list 'dirs dir))
+    (helm-gtags-set-tag-location-alist major-mode dirs)
+
     (with-current-buffer (helm-candidate-buffer 'global)
       (dolist (dir dirs)
         (goto-char (point-max))
-        (call-process helm-gtags-global-cmd nil (current-buffer) nil "-c" prefix)))))
+        (setq begin (point))
+        (unless (zerop (call-process helm-gtags-global-cmd nil (current-buffer) nil "-c" prefix))
+          (error "Error:%s"  (buffer-substring-no-properties begin (point)))
+          (delete-region begin (point)))))))
 
 (defvar helm-source-gtags-complete
   `((name . "GNU GLOBAL complete")
@@ -269,7 +278,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         cmd-options dirs dir)
     (with-current-buffer helm-current-buffer
       (setq dir (helm-gtags-searched-directory nil nil))
-      (setq dirs (mapcar (lambda(Dir) (file-name-as-directory (file-truename (expand-file-name Dir))))
+      (setq dirs (mapcar (lambda(tmp-dir) (file-name-as-directory (file-truename (expand-file-name tmp-dir))))
                          (assoc-default major-mode helm-gtags-tag-location-alist)))
       (when dir (add-to-list 'dirs dir))
       (helm-gtags-set-tag-location-alist major-mode dirs)
