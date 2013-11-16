@@ -276,7 +276,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
                   (coding-system-for-write buf-coding))
         (dolist (dir dirs)
           (setq cmd-options (helm-gtags-construct-command type dir input))
-          (setq default-directory (helm-gtags-base-directory))
+          (setq default-directory dir)
           (goto-char (point-max))
           (setq begin (point))
           (apply 'call-process helm-gtags-global-cmd nil (current-buffer) nil cmd-options)
@@ -337,7 +337,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defun helm-gtags-parse-file-cmd()
   (let ((candidates-buf (get-buffer-create (assoc-default :parse-file helm-gtags-buf-alist)))
         (dir default-directory))
-    (with-current-buffer helm-current-buffer (helm-gtags-save-current-context))
+    ;; (with-current-buffer helm-current-buffer (helm-gtags-save-current-context))
     (with-current-buffer candidates-buf
       (erase-buffer)
       (setq default-directory dir)
@@ -539,11 +539,11 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (interactive)
   (helm-gtags-common '(helm-source-gtags-select) "") )
 
+
 (defun helm-source-gtags-select-tag (candidate)
   `((name . "tags")
-    (candidates .  (lambda ()
-                     (helm-gtags-candidates-in-buffer-tag ,candidate)) )
-    (volatile);;candidates
+    (candidates-in-buffer . (lambda ()
+                              (helm-gtags-candidates-in-buffer-tag ,candidate)))
     (delayed)
     (persistent-action . helm-gtags-tags-persistent-action)
     (action . helm-gtags-action-openfile))
@@ -552,8 +552,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-source-gtags-select-rtag (candidate)
   `((name . "rtags")
-    (candidates . helm-gtags-candidates-in-buffer-rtag)
-    (volatile);;candidates
+    (candidates-in-buffer . (lambda ()
+                              (helm-gtags-candidates-in-buffer-rtag ,candidate)))
     (delayed)
     (candidate-number-limit . ,helm-gtags-default-candidate-limit)
     (persistent-action . helm-gtags-tags-persistent-action)
@@ -571,27 +571,22 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-source-gtags-select-init()
   (let (candidates
-        ;; (cmd "global -c")
         (dirs (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source)))
         (default-tag-dir (helm-gtags-searched-directory))
-        (buf-coding buffer-file-coding-system)
-        )
+        (buf-coding buffer-file-coding-system))
     (when default-tag-dir (add-to-list 'dirs default-tag-dir ))
     (with-current-buffer (helm-candidate-buffer 'global)
-      (let (begin end
-                  (default-directory default-directory)
-                  (coding-system-for-read buf-coding)
-                  (coding-system-for-write buf-coding)
-                  )
+      (let ((begin)( end)
+            (default-directory default-directory)
+            (coding-system-for-read buf-coding)
+            (coding-system-for-write buf-coding))
         (dolist (dir dirs)
-          (setq default-directory (helm-gtags-base-directory))
+          (setq default-directory dir)
           (goto-char (point-max))
           (setq begin (point))
           (call-process helm-gtags-global-cmd nil (current-buffer) nil "-c")
-          ;; (call-process-shell-command cmd nil t)
           (setq end (point))
-          (put-text-property begin end 'default-directory default-directory)
-          )))))
+          (put-text-property begin end 'default-directory default-directory))))))
 
 (defvar helm-source-gtags-select
   `((name . "GNU GLOBAL SELECT")
