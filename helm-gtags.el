@@ -34,9 +34,10 @@
 ;;     (require 'helm-config)
 ;;     (require 'helm-gtags)
 ;;
-;;     (add-hook 'c-mode-hook '(lambda()
-;;                           (add-to-list 'helm-gtags-tag-location-list "/usr/include/")
-;;                           ))
+;;     (setq helm-gtags-tag-location-alist
+;;       '((c-mode  "/usr/include/" "/usr/kernel/")
+;;         (c++-mode  "/path/of/tag/2/" "/path/of/tag/3/")))
+
 ;;     (add-hook 'helm-gtags-mode-hook
 ;;               '(lambda ()
 ;;                  (local-set-key [(meta return)] 'helm-gtags-complete)
@@ -86,10 +87,13 @@
   :type 'boolean
   :group 'helm-gtags)
 
-(defcustom helm-gtags-tag-location-list nil
-  "tag locations."
-  :type 'list
+(defcustom helm-gtags-tag-location-alist nil
+  "tag locations for differnt major-mode.
+eq: '((c-mode . '(\"/usr/include/\" \"/usr/kernel/\"))
+  (c++-mode . '(\"/path/of/tag/2/\" \"/path/of/tag/3/\")))"
+  :type 'alist
   :group 'helm-gtags)
+
 
 (defcustom helm-gtags-default-candidate-limit 1000
   "default candidate limit."
@@ -167,39 +171,48 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (helm-declare-obsolete-variable
  'helm-c-gtags-read-only 'helm-gtags-read-only "0.8")
 
+(defun helm-gtags-set-tag-location-alist(key value)
+  (let ((kv (assoc key  helm-gtags-tag-location-alist)))
+    (if kv
+        (setf (cdr (assoc key  helm-gtags-tag-location-alist)) value)
+      (add-to-list 'helm-gtags-tag-location-alist `(,key . ,value)))))
+
 (defsubst helm-gtags-type-is-not-file-p (type)
   (not (eq type :file)))
 
 (defun helm-gtags-find-tag-directory()
-  (with-temp-buffer
-    (let ((status (call-process helm-gtags-global-cmd nil  (current-buffer) nil  "-p"))
-          tag-location)
-      (if (zerop status)
-          (let ((tagroot (buffer-substring
-                          (goto-char (point-min)) (line-end-position))))
-            (setq tag-location (file-truename (file-name-as-directory tagroot)))
-            (add-to-list 'helm-gtags-tag-location-list tag-location)
-            tag-location
-            )nil))))
+  (let((mode major-mode)
+       (dirs (assoc-default major-mode helm-gtags-tag-location-alist)))
+    (with-temp-buffer
+      (let ((status (call-process helm-gtags-global-cmd nil  (current-buffer) nil  "-p"))
+            tag-location)
+        (if (zerop status)
+            (let ((tagroot (buffer-substring
+                            (goto-char (point-min)) (line-end-position))))
+              (setq tag-location (file-truename (file-name-as-directory tagroot)))
+              (add-to-list 'dirs  tag-location)
+              (helm-gtags-set-tag-location-alist mode dirs)
+              tag-location
+              )nil)))))
 
-(defun helm-gtags-searched-directory(&optional nosearch)
+(defun helm-gtags-searched-directory(&optional nosearch default)
   (let((buf-filename (buffer-file-name))
        (i 0) tagroot dir found)
     (if (null buf-filename)
-        (file-truename (expand-file-name default-directory))
-      (while (and (< i (length helm-gtags-tag-location-list))
+        (or default (file-truename (expand-file-name default-directory)))
+      (while (and (< i (length (assoc-default major-mode helm-gtags-tag-location-alist)))
                   (null tagroot))
-        (setq dir (nth i helm-gtags-tag-location-list))
+        (setq dir (nth i (assoc-default major-mode helm-gtags-tag-location-alist)))
         (when (string-match (regexp-quote dir) (file-truename buf-filename))
           (setq tagroot dir))
         (setq i (1+ i)))
       (if tagroot tagroot
-        (if nosearch (file-truename (expand-file-name default-directory))
+        (if nosearch (or default (file-truename (expand-file-name default-directory)))
           (or (helm-gtags-find-tag-directory)
-              (file-truename (expand-file-name default-directory))))))))
+              (or default (file-truename (expand-file-name default-directory)))))))))
 
 (defun helm-source-gtags-complete-init()
-  (let ((dirs (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source)))
+  (let ((dirs (assoc-default major-mode helm-gtags-tag-location-alist))
         (prefix (helm-gtags-token-at-point)))
     (with-current-buffer (helm-candidate-buffer 'global)
       (dolist (dir dirs)
@@ -250,12 +263,20 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (find-file-other-window file)))
 
 (defun helm-gtags-exec-global-cmd(type &optional input)
-  (let (cmd-options
-        (candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
-        (cache (assoc-default type helm-gtags-cache-alist))
-        (dirs (or (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source))
-                  helm-gtags-tag-location-list))
-        (buf-coding buffer-file-coding-system))
+  (let ((candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
+        ;; (cache-info (assoc-default type helm-gtags-cache-alist))
+        (buf-coding buffer-file-coding-system)
+        cmd-options dirs dir)
+    (with-current-buffer helm-current-buffer
+      (setq dir (helm-gtags-searched-directory nil nil))
+      (setq dirs (mapcar (lambda(Dir) (file-name-as-directory (file-truename (expand-file-name Dir))))
+                         (assoc-default major-mode helm-gtags-tag-location-alist)))
+      (when dir (add-to-list 'dirs dir))
+      (helm-gtags-set-tag-location-alist major-mode dirs)
+      (case type
+        (:file  (setf (cdr (assoc type helm-gtags-cache-alist)) (cons major-mode dirs)))
+        (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) (cons major-mode input)))))
+
     (with-current-buffer candidates-buf
       (erase-buffer)
       (let (begin end (default-directory default-directory)
@@ -266,12 +287,12 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           (setq default-directory dir)
           (goto-char (point-max))
           (setq begin (point))
-          (apply 'call-process helm-gtags-global-cmd nil (current-buffer) nil cmd-options)
-          (setq end (point))
-          (put-text-property begin end 'default-directory default-directory))
-        (case type
-          (:file  (setf (cdr (assoc type helm-gtags-cache-alist)) dirs))
-          (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) input)))))
+          (if (zerop (apply 'call-process helm-gtags-global-cmd nil (current-buffer) nil cmd-options))
+              (progn
+                (setq end (point))
+                (put-text-property begin end 'default-directory default-directory))
+            (error "Error:%s"  (buffer-substring-no-properties begin (point)))
+            (delete-region begin (point))))))
     candidates-buf))
 
 (defun helm-gtags-find-tag-from-here-cands-cmd()
@@ -402,26 +423,31 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (forward-line (1- line))
     (helm-match-line-color-current-line)))
 
-(defun helm-gtags-use-cache-p(type input cache)
-  (case type
-    (:file
-     (let ((buf-filename (buffer-file-name (current-buffer))))
-       (or (null buf-filename)
-           (and cache
-                (some
-                 '(lambda (dir)
-                    (string-match (regexp-quote dir)
-                                  (file-truename buf-filename)))cache)))))
-    (otherwise
-     (string-equal input cache))))
+(defun helm-gtags-use-cache-p(type input cache-info)
+  (with-current-buffer helm-current-buffer
+    (let ((mode (car cache-info))
+          (cache-type-2 (cdr cache-info))
+          (buf-filename (buffer-file-name (current-buffer))))
+      (case type
+        (:file
+         (or (null buf-filename)
+             (and (equal major-mode mode)
+                  (some
+                   '(lambda (dir)
+                      (string-match (regexp-quote dir)
+                                    (file-truename buf-filename))) cache-type-2))))
+        (otherwise
+         (and (string-equal input cache-type-2)
+              (equal major-mode mode)))))))
+
 
 (defun helm-gtags-get-candidates-buf-with-cache(type &optional in)
   (let ((input (or in (car (helm-mp-split-pattern helm-pattern))))
         (candidates-buf (get-buffer (assoc-default type helm-gtags-buf-alist)))
-        (cache (assoc-default type helm-gtags-cache-alist)))
+        (cache-info (assoc-default type helm-gtags-cache-alist)))
     (with-current-buffer helm-current-buffer (helm-gtags-save-current-context))
-    (if (and cache (bufferp candidates-buf)(buffer-live-p candidates-buf)
-             (helm-gtags-use-cache-p type input cache))
+    (if (and cache-info (bufferp candidates-buf)(buffer-live-p candidates-buf)
+             (helm-gtags-use-cache-p type input cache-info))
         candidates-buf
       (helm-gtags-exec-global-cmd type input))))
 
@@ -569,7 +595,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-source-gtags-select-init()
   (let (candidates
-        (dirs (helm-attr 'helm-gtags-tag-location-list (helm-get-current-source)))
+        (dirs (assoc-default major-mode helm-gtags-tag-location-alist))
         (buf-coding buffer-file-coding-system))
     (with-current-buffer (helm-candidate-buffer 'global)
       (let ((begin)( end)
@@ -607,16 +633,12 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (let ((helm-quit-if-no-candidate #'(lambda() (message "gtags:not found")))
         (helm-execute-action-at-once-if-one t)
         (buf (get-buffer-create helm-gtags-buffer))
-        (dir (helm-gtags-searched-directory))
-        (custom-dirs (mapcar (lambda(Dir) (file-name-as-directory Dir))
-                             helm-gtags-tag-location-list))
+        (custom-dirs (assoc-default major-mode helm-gtags-tag-location-alist))
         (src (car srcs)))
-    (when dir (add-to-list 'custom-dirs dir))
     (when (helm-gtags--using-other-window-p) (setq helm-gtags-use-otherwin t))
     (dolist (src srcs)
       (when (symbolp src) (setq src (symbol-value src)))
       (unless (helm-attr 'init-name src) (helm-attrset 'init-name  (helm-attr 'name src) src))
-      (helm-attrset 'helm-gtags-tag-location-list custom-dirs src)
       (helm-attrset 'name
                     (format "Searched %s at %s" (or (helm-attr 'init-name src) "")
                             (mapconcat 'identity custom-dirs "  "))
