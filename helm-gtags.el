@@ -729,8 +729,10 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
                 (format "Parsed File: %s"
                         helm-gtags-parsed-file)
                 helm-source-gtags-parse-file)
-  (helm :sources '(helm-source-gtags-parse-file)
-        :buffer (get-buffer-create helm-gtags-buffer)))
+  ;; (helm-execute-action-at-once-if-one t)
+  (let ((helm-quit-if-no-candidate #'(lambda() (message "gtags:no candidates"))))
+    (helm :sources '(helm-source-gtags-parse-file)
+          :buffer (get-buffer-create helm-gtags-buffer))))
 
 ;;;###autoload
 (defun helm-gtags-pop-stack ()
