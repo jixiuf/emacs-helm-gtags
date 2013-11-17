@@ -268,7 +268,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (helm-gtags-common '(helm-source-gtags-complete)
                      (helm-gtags-token-at-point)))
 
-
 (defun helm-gtags-find-tag-from-here-cands-cmd()
   (let ((candidates-buf (get-buffer-create (assoc-default :tag-here helm-gtags-buf-alist)))
         token from-here
@@ -701,17 +700,17 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (helm-gtags-common '(helm-source-gtags-rtags)))
 
 ;;;###autoload
-(defun helm-gtags-find-symbol ()
+(defun helm-gtags-find-symbol()
   "Jump to the symbol location"
   (interactive)
   (helm-gtags-common '(helm-source-gtags-gsyms)))
 
 ;;;###autoload
-(defun helm-gtags-find-files ()
+(defun helm-gtags-find-files(&optional input)
   "Find file with gnu global
 you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   (interactive)
-  (helm-gtags-common '(helm-source-gtags-files) ""))
+  (helm-gtags-common '(helm-source-gtags-files) (or input "")))
 
 ;;;###autoload
 (defun helm-gtags-select ()
