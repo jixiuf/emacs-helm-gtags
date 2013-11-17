@@ -114,6 +114,8 @@ You could add your lib directory here ,like
 (setq helm-gtags-tag-location-alist
       '((c-mode  "/usr/include/" "/usr/kernel/")
         (c++-mode  "/path/of/tag/2/" "/path/of/tag/3/")))
+you neednot set this if you just use one tag
+        
 ```
 of cource  you should run :
 ```
@@ -162,6 +164,7 @@ If this variable is non-nil, TAG file is updated after saving buffer.
 (setq helm-gtags-read-only t)
 (setq helm-gtags-auto-update t)
 
+;;you neednot set this if you just use one tag
 (setq helm-gtags-tag-location-alist
       '((c-mode  "/usr/include/" "/usr/kernel/")
         (c++-mode  "/path/of/tag/2/" "/path/of/tag/3/")))

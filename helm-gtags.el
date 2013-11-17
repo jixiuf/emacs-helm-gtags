@@ -34,6 +34,7 @@
 ;;     (require 'helm-config)
 ;;     (require 'helm-gtags)
 ;;
+;;     you neednot set this if you just use one tag
 ;;     (setq helm-gtags-tag-location-alist
 ;;       '((c-mode  "/usr/include/" "/usr/kernel/")
 ;;         (c++-mode  "/path/of/tag/2/" "/path/of/tag/3/")))
@@ -90,7 +91,8 @@
 (defcustom helm-gtags-tag-location-alist nil
   "tag locations for differnt major-mode.
 eq: '((c-mode . '(\"/usr/include/\" \"/usr/kernel/\"))
-  (c++-mode . '(\"/path/of/tag/2/\" \"/path/of/tag/3/\")))"
+  (c++-mode . '(\"/path/of/tag/2/\" \"/path/of/tag/3/\"))),
+you neednot set this if you just use one tag"
   :type 'alist
   :group 'helm-gtags)
 
