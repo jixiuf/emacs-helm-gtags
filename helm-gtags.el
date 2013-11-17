@@ -179,6 +179,12 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (setf (cdr (assoc key  helm-gtags-tag-location-alist)) value)
       (add-to-list 'helm-gtags-tag-location-alist `(,key . ,value)))))
 
+(defun helm-gtags-get-tag-location-alist(mode)
+  (mapcar (lambda(tmp-dir)
+            (file-name-as-directory
+             (file-truename (expand-file-name tmp-dir))))
+          (assoc-default major-mode helm-gtags-tag-location-alist)))
+
 (defun helm-gtags-delete-cur-symbol()
   (let ((bound (bounds-of-thing-at-point 'symbol)))
     (if bound
@@ -195,7 +201,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-gtags-find-tag-directory()
   (let((mode major-mode)
-       (dirs (assoc-default major-mode helm-gtags-tag-location-alist)))
+       (dirs (helm-gtags-get-tag-location-alist major-mode)))
     (with-temp-buffer
       (let ((status (call-process helm-gtags-global-cmd nil  (current-buffer) nil  "-p"))
             tag-location)
@@ -210,12 +216,13 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-gtags-searched-directory(&optional nosearch default)
   (let((buf-filename (buffer-file-name))
+       (dirs (helm-gtags-get-tag-location-alist major-mode))
        (i 0) tagroot dir found)
     (if (null buf-filename)
         (or default (file-truename (expand-file-name default-directory)))
-      (while (and (< i (length (assoc-default major-mode helm-gtags-tag-location-alist)))
+      (while (and (< i (length dirs))
                   (null tagroot))
-        (setq dir (nth i (assoc-default major-mode helm-gtags-tag-location-alist)))
+        (setq dir (nth i dirs))
         (when (string-match (regexp-quote dir) (file-truename buf-filename))
           (setq tagroot dir))
         (setq i (1+ i)))
@@ -225,8 +232,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
               (or default (file-truename (expand-file-name default-directory)))))))))
 
 (defun helm-source-gtags-complete-init()
-  (let ((dirs (mapcar (lambda(tmp-dir) (file-name-as-directory (file-truename (expand-file-name tmp-dir))))
-                      (assoc-default major-mode helm-gtags-tag-location-alist)))
+  (let ((dirs (helm-gtags-get-tag-location-alist major-mode))
         (dir (helm-gtags-searched-directory nil nil))
         (prefix (helm-gtags-token-at-point))
         begin)
@@ -444,7 +450,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (let ((helm-quit-if-no-candidate #'(lambda() (message "gtags:not found")))
         (helm-execute-action-at-once-if-one t)
         (buf (get-buffer-create helm-gtags-buffer))
-        (custom-dirs (assoc-default major-mode helm-gtags-tag-location-alist))
+        (custom-dirs (helm-gtags-get-tag-location-alist major-mode))
         (src (car srcs)))
     (when (helm-gtags--using-other-window-p) (setq helm-gtags-use-otherwin t))
     (dolist (src srcs)
@@ -466,8 +472,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (with-current-buffer helm-current-buffer
       (setq mode major-mode)
       (setq dir (helm-gtags-searched-directory nil nil))
-      (setq dirs (mapcar (lambda(tmp-dir) (file-name-as-directory (file-truename (expand-file-name tmp-dir))))
-                         (assoc-default mode helm-gtags-tag-location-alist)))
+      (setq dirs (helm-gtags-get-tag-location-alist mode))
       (when dir (add-to-list 'dirs dir))
       (helm-gtags-set-tag-location-alist mode dirs)
       (case type
@@ -645,7 +650,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 (defun helm-source-gtags-select-init()
   (let (candidates
-        (dirs (assoc-default major-mode helm-gtags-tag-location-alist))
+        (dirs (helm-gtags-get-tag-location-alist major-mode))
         (buf-coding buffer-file-coding-system))
     (with-current-buffer (helm-candidate-buffer 'global)
       (let ((begin)( end)
