@@ -475,8 +475,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
       (when dir (add-to-list 'dirs dir))
       (helm-gtags-set-tag-location-alist mode dirs)
       (case type
-        (:file  (setf (cdr (assoc type helm-gtags-cache-alist)) (cons mode dirs)))
-        (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) (cons mode input)))))
+        (:file  (setf (cdr (assoc type helm-gtags-cache-alist)) (list mode input dirs)))
+        (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) (list mode input)))))
 
     (with-current-buffer candidates-buf
       (erase-buffer)
@@ -500,18 +500,20 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defun helm-gtags-use-cache-p(type input cache-info)
   (with-current-buffer helm-current-buffer
     (let ((mode (car cache-info))
-          (cache-type-2 (cdr cache-info))
+          (cache-input (nth 1 cache-info))
           (buf-filename (buffer-file-name (current-buffer))))
       (case type
         (:file
-         (or (null buf-filename)
-             (and (equal major-mode mode)
-                  (some
-                   '(lambda (dir)
-                      (string-match (regexp-quote dir)
-                                    (file-truename buf-filename))) cache-type-2))))
+         (let((cache-dirs (nth 2 cache-info)))
+           (or (null buf-filename)
+               (and (equal major-mode mode)
+                    (string-equal input cache-input)
+                    (some
+                     '(lambda (dir)
+                        (string-match (regexp-quote dir)
+                                      (file-truename buf-filename))) cache-dirs)))))
         (otherwise
-         (and (string-equal input cache-type-2)
+         (and (string-equal input cache-input)
               (equal major-mode mode)))))))
 
 
@@ -710,7 +712,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   "Find file with gnu global
 you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   (interactive)
-  (helm-gtags-common '(helm-source-gtags-files) (or input "")))
+  (let ((helm-ff-transformer-show-only-basename nil))
+    (helm-gtags-common '(helm-source-gtags-files) (or input ""))))
 
 ;;;###autoload
 (defun helm-gtags-select ()
