@@ -148,12 +148,12 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (:file   . ,helm-gtags-file-cache)))
 
 (defvar helm-gtags-buf-alist
-  '((:tag    . " *helm-gtags-tags*")
-    (:rtag   . " *helm-gtags-rtags*")
-    (:symbol . " *helm-gtags-symbol*")
-    (:file   . " *helm-gtags-files*")
+  '((:tag        . " *helm-gtags-tags*")
+    (:rtag       . " *helm-gtags-rtags*")
+    (:symbol     . " *helm-gtags-symbol*")
+    (:file       . " *helm-gtags-files*")
     (:tag-here   . " *helm-gtags-tags-here*")
-    (:parse-file   . " *helm-gtags-tags-parse-file*")))
+    (:parse-file . " *helm-gtags-tags-parse-file*")))
 
 (defvar helm-gtags-command-option-alist
   '((:tag    . "")
