@@ -458,21 +458,21 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
           :input (or input (thing-at-point 'symbol))
           :buffer buf)))
 
-
 (defun helm-gtags-exec-global-cmd(type &optional input)
   (let ((candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
         ;; (cache-info (assoc-default type helm-gtags-cache-alist))
         (buf-coding buffer-file-coding-system)
-        cmd-options dirs dir)
+        mode cmd-options dirs dir)
     (with-current-buffer helm-current-buffer
+      (setq mode major-mode)
       (setq dir (helm-gtags-searched-directory nil nil))
       (setq dirs (mapcar (lambda(tmp-dir) (file-name-as-directory (file-truename (expand-file-name tmp-dir))))
-                         (assoc-default major-mode helm-gtags-tag-location-alist)))
+                         (assoc-default mode helm-gtags-tag-location-alist)))
       (when dir (add-to-list 'dirs dir))
-      (helm-gtags-set-tag-location-alist major-mode dirs)
+      (helm-gtags-set-tag-location-alist mode dirs)
       (case type
-        (:file  (setf (cdr (assoc type helm-gtags-cache-alist)) (cons major-mode dirs)))
-        (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) (cons major-mode input)))))
+        (:file  (setf (cdr (assoc type helm-gtags-cache-alist)) (cons mode dirs)))
+        (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) (cons mode input)))))
 
     (with-current-buffer candidates-buf
       (erase-buffer)
@@ -488,7 +488,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
               (progn
                 (setq end (point))
                 (put-text-property begin end 'default-directory default-directory))
-            (error "Error:%s"  (buffer-substring-no-properties begin (point)))
+            (when (string-match "global: GTAGS not found." (buffer-substring-no-properties begin (point)))
+              (helm-gtags-set-tag-location-alist mode (delete dir dirs)))
             (delete-region begin (point))))))
     candidates-buf))
 
