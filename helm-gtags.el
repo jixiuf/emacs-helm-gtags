@@ -118,6 +118,14 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   :type 'integer
   :group 'helm-gtags)
 
+(defcustom helm-gtags-before-select-hook nil
+  :group 'helm-gtags
+  :type 'hook)
+
+(defcustom helm-gtags-goto-line-before-hook nil
+  :group 'helm-gtags
+  :type 'hook)
+
 (defvar helm-gtags-last-update-time (float-time (current-time))
   "`global -u --single-update'")
 
@@ -275,6 +283,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (buf-filename (file-truename (buffer-file-name helm-current-buffer))))
     (with-current-buffer helm-current-buffer
       (helm-gtags-save-current-context)
+      (run-hooks 'helm-gtags-before-select-hook)
       (setq token (or (thing-at-point 'symbol) ""))
       (setq from-here (format "--from-here=%d:%s" (line-number-at-pos) buf-filename))
       )
@@ -343,6 +352,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     'helm-gtags-open-file))
 
 (defun helm-gtags-do-open-file (open-func file line)
+  (run-hooks 'helm-gtags-goto-line-before-hook)
   (funcall open-func file helm-gtags-read-only)
   (goto-char (point-min))
   (forward-line (1- line))
@@ -459,6 +469,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
                     (format "Searched %s at %s" (or (helm-attr 'init-name src) "")
                             (mapconcat 'identity custom-dirs "  "))
                     src))
+    (run-hooks 'helm-gtags-before-select-hook)
     (helm :sources srcs
           :input (or input (thing-at-point 'symbol))
           :buffer buf)))
@@ -732,6 +743,7 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   (interactive)
   ;; (helm-gtags-find-tag-directory)
   (helm-gtags-save-current-context)
+  (run-hooks 'helm-gtags-before-select-hook)
   (when (helm-gtags--using-other-window-p)
     (setq helm-gtags-use-otherwin t))
   (helm-gtags-set-parsed-file)
