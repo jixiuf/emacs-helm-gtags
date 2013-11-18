@@ -56,8 +56,8 @@
   (require 'cl))
 
 (require 'helm)
-(require 'helm-files)
 (require 'helm-match-plugin)
+(require 'helm-utils)
 (require 'which-func)
 (require 'thingatpt)
 
