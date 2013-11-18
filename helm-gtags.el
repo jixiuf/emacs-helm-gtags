@@ -231,16 +231,20 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (let ((dirs (helm-gtags-get-tag-location-alist major-mode))
         (dir (helm-gtags-searched-directory nil nil))
         (prefix (helm-gtags-token-at-point))
+        (mode major-mode)
+        (default-directory default-directory)
         begin)
     (when dir (add-to-list 'dirs dir))
     (helm-gtags-set-tag-location-alist major-mode dirs)
 
     (with-current-buffer (helm-candidate-buffer 'global)
       (dolist (dir dirs)
+        (setq default-directory dir)
         (goto-char (point-max))
         (setq begin (point))
         (unless (zerop (call-process helm-gtags-global-cmd nil (current-buffer) nil "-c" prefix))
-          (error "Error:%s"  (buffer-substring-no-properties begin (point)))
+          (when (string-match "global: GTAGS not found." (buffer-substring-no-properties begin (point)))
+            (helm-gtags-set-tag-location-alist mode (delete dir dirs)))
           (delete-region begin (point)))))))
 
 (defvar helm-source-gtags-complete
