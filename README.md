@@ -55,17 +55,6 @@ Input symbol and move to the locations.
 
 Input file name and open it.
 
-You can use those searching commands with prefix key,
-though I think this is unless now after support helm-gtags-tag-location-list.
-
-| Prefix Key  | Description                       |
-|:------------|:---------------------------------:|
-| C-u         | Searches from specified directory |
-| C-u C-u     | Searches under current directory  |
-| C--         | Jump to symbol with other window  |
-
-
-
 #### `helm-gtags-select`
 
 Tag jump using gtags and helm
@@ -90,21 +79,6 @@ You can generate new tags with `C-uC-u` prefix.
 
 Show symbols in current file like `gtags-parse-file`. You can choose
 any files with `C-u` prefix.
-
-#### `helm-gtags-pop-stack`
-
-Move to previous point on the stack.
-helm-gtags pushes current point to stack before executing each jump functions.
-
-#### `helm-gtags-show-stack`
-
-Show context stack with helm interface.
-You can jump to the context.
-
-#### `helm-gtags-clear-stack`
-
-Clear current context stack.
-
 
 ## Customize Variables
 
@@ -147,6 +121,19 @@ Open file as readonly, if this value is `non-nil`(Default is `nil`).
 
 If this variable is non-nil, TAG file is updated after saving buffer.
 
+### History Navigate Feature 
+do not support history navigate feature directly.
+if you want this feature, you just need use
+helm-gtags-select-before-hook and helm-gtags-goto-line-before-hook hooks,
+
+for eaxmple using bookmark and helm-bookmark.el 
+in helm-gtags-select-before-hook hook you save a tmp marker to a variable
+and in helm-gtags-goto-line-before-hook you push the tmp marker to
+bookmark list
+and      (setq bookmark-sort-flag nil) ;in LIFO order
+         (setq helm-bookmark-show-location t)
+I will write a bookmark-cycle.el for this.
+
 ## Sample Configuration
 
 ```elisp
@@ -179,8 +166,6 @@ If this variable is non-nil, TAG file is updated after saving buffer.
                  (local-set-key (kbd "M-t") 'helm-gtags-find-tag)
                  (local-set-key (kbd "M-s") 'helm-gtags-find-symbol)
                  (local-set-key (kbd "M-r") 'helm-gtags-find-rtag)
-                 (local-set-key (kbd "C-,") 'helm-gtags-pop-stack)
-                 (local-set-key (kbd "M-*") 'helm-gtags-show-stack)
                  (local-set-key (kbd "M-g M-p") 'helm-gtags-parse-file)
                  (local-set-key (kbd "C-c C-f") 'helm-gtags-find-files)))
 ```
