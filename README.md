@@ -126,7 +126,7 @@ do not support history navigate feature directly.
 if you want this feature, you just need use
 helm-gtags-select-before-hook and helm-gtags-goto-line-before-hook hooks,
 
-for eaxmple using bm.el helm-bm.el
+#### for eaxmple using bm.el helm-bm.el
 
 https://github.com/joodland/bm
 https://github.com/jixiuf/helm-bm
@@ -155,8 +155,37 @@ you just need this lines:
    ;;;  but bm-next bm-previous is not follow LIFO order(that is, most
    recently set ones come first, oldest ones come last) 
 ```
+#### Another example use emacs default bookmark system
+ emacs default bookmark doesnot provide bookmark-next or bookmark-previous
+ so I write https://github.com/jixiuf/bookmark-cycle
+ and with the helm-bookmark.el in https://github.com/emacs-helm/helm
 
+```elisp
+;; first: you should
+      (require 'bookmark)
+      (setq bookmark-sort-flag nil)           ;
+      (setq bookmark-bmenu-file-column 120)   ;
+      
+;; then:
+      (global-set-key (kbd "<C-f2>") 'bookmark-cycle-push)
+      (global-set-key (kbd "M-,") 'bookmark-cycle-next)
+      (global-set-key (kbd "M-/") 'bookmark-cycle-previous)
+      
+      (require 'helm-bookmark)
+      (setq helm-bookmark-show-location t)  ;
+      (define-key global-map (kbd "M-*") 'helm-pp-bookmarks);; in helm-bookmark.el
 
+     (require 'helm-gtags)
+      (add-hook 'helm-gtags-goto-line-before-hook 'bookmark-cycle-push)
+      
+      
+
+```
+     these package lets you cycle among bookmarks if you donot want use bookmark-cycle.el.
+     http://www.emacswiki.org/emacs/BookmarkPlus
+     http://www.emacswiki.org/emacs/bookmark-add.el
+     http://www.emacswiki.org/emacs/BookMarks
+     
 ## Sample Configuration
 
 ```elisp
