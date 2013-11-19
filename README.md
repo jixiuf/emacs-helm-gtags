@@ -126,13 +126,36 @@ do not support history navigate feature directly.
 if you want this feature, you just need use
 helm-gtags-select-before-hook and helm-gtags-goto-line-before-hook hooks,
 
-for eaxmple using bookmark and helm-bookmark.el 
-in helm-gtags-select-before-hook hook you save a tmp marker to a variable
-and in helm-gtags-goto-line-before-hook you push the tmp marker to
-bookmark list
-and      (setq bookmark-sort-flag nil) ;in LIFO order
-         (setq helm-bookmark-show-location t)
-I will write a bookmark-cycle.el for this.
+for eaxmple using bm.el helm-bm.el
+
+https://github.com/joodland/bm
+https://github.com/jixiuf/helm-bm
+you just need this lines:
+
+```elisp
+   (autoload 'bm-toggle   "bm" "Toggle bookmark in current buffer." t)
+   (autoload 'bm-next     "bm" "Goto bookmark."                     t)
+   (autoload 'bm-previous "bm" "Goto previous bookmark."            t)
+   (global-set-key (kbd "<C-f2>")   'bm-toggle)
+   (global-set-key (kbd "M-,")      'bm-next)
+   (global-set-key (kbd "M-/")      'bm-previous)
+   (setq bm-highlight-style 'bm-highlight-only-fringe)
+   (setq bm-cycle-all-buffers t)
+   
+   (autoload 'helm-bm "helm-bm" "List All Bookmarks with helm.el."            t)
+   (global-set-key (kbd "M-*")   'helm-bm)
+   
+   
+   (require 'helm-gtags)
+   (autoload 'bm-bookmark-add "bm" "Add bookmark at current line.")
+   (add-hook 'helm-gtags-goto-line-before-hook 'bm-bookmark-add)
+   ;;; and other helm-gtags.el configuration
+   
+   
+   ;;;  but bm-next bm-previous is not follow LIFO order(that is, most
+   recently set ones come first, oldest ones come last) 
+```
+
 
 ## Sample Configuration
 
