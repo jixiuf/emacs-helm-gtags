@@ -128,6 +128,11 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   :group 'helm-gtags
   :type 'hook)
 
+(defcustom helm-gtags-quit-or-no-candidates-hook nil
+  ""
+  :group 'helm-gtags
+  :type 'hook)
+
 (defvar helm-gtags-last-update-time (float-time (current-time))
   "`global -u --single-update'")
 
@@ -397,7 +402,10 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 
 (defun helm-gtags-common (srcs &optional input)
-  (let ((helm-quit-if-no-candidate #'(lambda() (message "gtags:not found")))
+  (let ((helm-quit-if-no-candidate #'(lambda()
+                                       (with-current-buffer helm-current-buffer
+                                         (run-hooks 'helm-gtags-quit-or-no-candidates-hook))
+                                       (message "gtags:not found")))
         (helm-execute-action-at-once-if-one t)
         (buf (get-buffer-create helm-gtags-buffer))
         (custom-dirs (helm-gtags-get-tag-location-alist major-mode))
@@ -413,7 +421,9 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (run-hooks 'helm-gtags-select-before-hook)
     (helm :sources srcs
           :input (or input (thing-at-point 'symbol))
-          :buffer buf)))
+          :buffer buf)
+    (when (eq 1 helm-exit-status)
+      (run-hooks 'helm-gtags-quit-or-no-candidates-hook))))
 
 (defun helm-gtags-exec-global-cmd(type &optional input)
   (let ((candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
@@ -677,9 +687,14 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
                         helm-gtags-parsed-file)
                 helm-source-gtags-parse-file)
   ;; (helm-execute-action-at-once-if-one t)
-  (let ((helm-quit-if-no-candidate #'(lambda() (message "gtags:no candidates"))))
+  (let ((helm-quit-if-no-candidate #'(lambda()
+                                       (with-current-buffer helm-current-buffer
+                                         (run-hooks 'helm-gtags-quit-or-no-candidates-hook))
+                                       (message "gtags:no candidates"))))
     (helm :sources '(helm-source-gtags-parse-file)
-          :buffer (get-buffer-create helm-gtags-buffer))))
+          :buffer (get-buffer-create helm-gtags-buffer))
+    (when (eq 1 helm-exit-status)
+      (run-hooks 'helm-gtags-quit-or-no-candidates-hook))))
 
 (defsubst helm-gtags--update-tags-params ( &optional current-prefix-arg)
   (case (prefix-numeric-value current-prefix-arg)
