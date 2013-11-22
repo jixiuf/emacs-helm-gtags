@@ -128,9 +128,12 @@ helm-gtags-select-before-hook and helm-gtags-goto-line-before-hook hooks,
 
 #### for eaxmple using bm.el helm-bm.el
 
-https://github.com/joodland/bm (origin ) 
+https://github.com/joodland/bm (origin )
+
 https://github.com/jixiuf/bm (my fork support cycle in LIFO order )
+
 https://github.com/jixiuf/helm-bm
+
 you just need this lines:
 
 ```elisp
