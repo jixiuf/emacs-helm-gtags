@@ -128,8 +128,12 @@ helm-gtags-select-before-hook and helm-gtags-goto-line-before-hook hooks,
 
 #### for eaxmple using bm.el helm-bm.el
 
-https://github.com/joodland/bm
+https://github.com/joodland/bm (origin )
+
+https://github.com/jixiuf/bm (my fork support cycle in LIFO order )
+
 https://github.com/jixiuf/helm-bm
+
 you just need this lines:
 
 ```elisp
@@ -152,7 +156,8 @@ you just need this lines:
    ;;; and other helm-gtags.el configuration
    
    
-   ;;;  but bm-next bm-previous is not follow LIFO order(that is, most
+   ;;;  but bm-next bm-previous in https://github.com/joodland/bm
+   does not support cycle in LIFO order(that is, most
    recently set ones come first, oldest ones come last) 
 ```
 #### Another example use emacs default bookmark system
