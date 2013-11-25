@@ -398,7 +398,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (find-file filename)
     (goto-char (point-min))
     (forward-line (1- line))
-    (helm-match-line-color-current-line)))
+    (helm-highlight-current-line)))
 
 
 (defun helm-gtags-common (srcs &optional input)
