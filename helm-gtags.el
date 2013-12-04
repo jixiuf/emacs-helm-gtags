@@ -349,7 +349,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (run-hooks 'helm-gtags-goto-line-before-hook)
   (funcall open-func file helm-gtags-read-only)
   (goto-char (point-min))
-  (forward-line (1- line)))
+  (forward-line (1- line))
+  (back-to-indentation))
 
 (defun helm-gtags-open-file (file readonly)
   (if readonly
