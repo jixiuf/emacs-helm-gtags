@@ -510,16 +510,17 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defun helm-gtags-candidates-in-buffer(buf)
   (helm-candidates-in-buffer-1
    buf helm-pattern
-   (or (assoc-default 'get-line source)
+   (or (assoc-default 'get-line (helm-get-current-source))
        #'buffer-substring-no-properties)
-   ;; use external variable `source'.
-   (or (assoc-default 'search source)
-       (if (assoc 'search-from-end source)
+   ;; use external variable `(helm-get-current-source)'.
+   (or (assoc-default 'search (helm-get-current-source))
+       (if (assoc 'search-from-end (helm-get-current-source))
            '(helm-candidates-in-buffer-search-from-end)
          '(helm-candidates-in-buffer-search-from-start)))
-   (helm-candidate-number-limit source)
-   (assoc 'search-from-end source)
-   (helm-attr 'match-part)))
+   (helm-candidate-number-limit (helm-get-current-source))
+   (assoc 'search-from-end (helm-get-current-source))
+   (helm-attr 'match-part)
+   (helm-get-current-source)))
 
 
 (defvar helm-source-gtags-tags
