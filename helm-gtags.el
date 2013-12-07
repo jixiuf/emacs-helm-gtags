@@ -118,6 +118,11 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   :type 'integer
   :group 'helm-gtags)
 
+(defcustom helm-gtags-input-idle-delay helm-input-idle-delay ;
+  "`helm-input-idle-delay' for helm-gtags source."
+  :type 'integer
+  :group 'helm-gtags)
+
 (defcustom helm-gtags-select-before-hook nil
   ""
   :group 'helm-gtags
@@ -408,6 +413,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
                                        (with-current-buffer helm-current-buffer
                                          (run-hooks 'helm-gtags-quit-or-no-candidates-hook))
                                        (message "gtags:not found")))
+        (helm-input-idle-delay helm-gtags-input-idle-delay)
         (helm-execute-action-at-once-if-one t)
         (buf (get-buffer-create helm-gtags-buffer))
         (custom-dirs (helm-gtags-get-tag-location-alist major-mode))
@@ -525,26 +531,23 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 
 
 (defvar helm-source-gtags-tags
-  '((name . "tag")
+  `((name . "tag")
     (candidates-in-buffer . helm-gtags-candidates-in-buffer-tag)
     (get-line . buffer-substring)
-    (delayed)
     (persistent-action . helm-gtags-tags-persistent-action)
     (action . helm-gtags-action-openfile)))
 
 (defvar helm-source-gtags-gsyms
-  '((name . "symbol")
+  `((name . "symbol")
     (candidates-in-buffer . helm-gtags-candidates-in-buffer-symbol)
     (get-line . buffer-substring)
-    (delayed)
     (persistent-action . helm-gtags-tags-persistent-action)
     (action . helm-gtags-action-openfile)))
 
 (defvar helm-source-gtags-rtags
-  '((name . "rtags")
+  `((name . "rtags")
     (candidates-in-buffer . helm-gtags-candidates-in-buffer-rtag)
     (get-line . buffer-substring)
-    (delayed)
     (persistent-action . helm-gtags-tags-persistent-action)
     (action . helm-gtags-action-openfile)))
 
@@ -578,7 +581,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (candidates-in-buffer . (lambda ()
                               (helm-gtags-candidates-in-buffer-tag ,candidate)))
     (get-line . buffer-substring)
-    (delayed)
     (persistent-action . helm-gtags-tags-persistent-action)
     (action . helm-gtags-action-openfile)))
 
@@ -587,7 +589,6 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (candidates-in-buffer . (lambda ()
                               (helm-gtags-candidates-in-buffer-rtag ,candidate)))
     (get-line . buffer-substring)
-    (delayed)
     (candidate-number-limit . ,helm-gtags-default-candidate-limit)
     (persistent-action . helm-gtags-tags-persistent-action)
     (action . helm-gtags-action-openfile)))
