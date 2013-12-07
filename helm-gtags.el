@@ -62,6 +62,10 @@
 (require 'which-func)
 (require 'thingatpt)
 
+(declare-function pulse-momentary-highlight-one-line "pulse")
+(declare-function pulse-momentary-highlight-region "pulse")
+(declare-function some "cl")
+
 (defgroup helm-gtags nil
   "GNU GLOBAL for helm"
   :group 'helm)
@@ -332,6 +336,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     candidates-buf))
 
 (defun helm-gtags-goto-tag-pos()
+  (require 'pulse)
   (let ((old-pos (point)))
     (if (search-forward
          (car (helm-mp-split-pattern helm-pattern)) (point-at-eol) t)
