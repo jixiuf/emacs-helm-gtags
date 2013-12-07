@@ -121,6 +121,10 @@ Open file as readonly, if this value is `non-nil`(Default is `nil`).
 
 If this variable is non-nil, TAG file is updated after saving buffer.
 
+#### `helm-gtags-input-idle-delay'
+
+helm-input-idle-delay for helm-gtags
+
 ### History Navigate Feature 
 do not support history navigate feature directly.
 if you want this feature, you just need use
