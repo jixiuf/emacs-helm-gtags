@@ -181,10 +181,11 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
       (add-to-list 'helm-gtags-tag-location-alist `(,key . ,value)))))
 
 (defun helm-gtags-get-tag-location-alist(mode)
-  (mapcar (lambda(tmp-dir)
-            (file-name-as-directory
-             (file-truename (expand-file-name tmp-dir))))
-          (assoc-default major-mode helm-gtags-tag-location-alist)))
+  (remq nil (mapcar (lambda(tmp-dir)
+                      (if (file-directory-p tmp-dir)
+                          (file-name-as-directory
+                           (file-truename (expand-file-name tmp-dir)))nil))
+                    (assoc-default major-mode helm-gtags-tag-location-alist))))
 
 (defun helm-gtags-delete-cur-symbol()
   (let ((bound (bounds-of-thing-at-point 'symbol)))
