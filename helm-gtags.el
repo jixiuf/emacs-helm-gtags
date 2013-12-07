@@ -331,11 +331,24 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (error "Failed: global --result cscope -f \"%s\"" helm-gtags-parsed-file)))
     candidates-buf))
 
+(defun helm-gtags-goto-tag-pos()
+  (let ((old-pos (point)))
+    (if (search-forward
+         (car (helm-mp-split-pattern helm-pattern)) (point-at-eol) t)
+        (progn
+          (goto-char (match-beginning 0))
+          (pulse-momentary-highlight-region
+           (match-beginning 0) (match-end 0)))
+      (goto-char old-pos)
+      (pulse-momentary-highlight-one-line old-pos))))
+
 (defun helm-gtags-parse-file-action (cand)
   (let ((line (when (string-match "\\s-+\\([1-9][0-9]*\\)\\s-+" cand)
                 (string-to-number (match-string 1 cand))))
         (open-func (helm-gtags-select-find-file-func)))
-    (helm-gtags-do-open-file open-func helm-gtags-parsed-file line)))
+    (helm-gtags-do-open-file open-func helm-gtags-parsed-file line)
+    (helm-gtags-goto-tag-pos)))
+
 
 (defun helm-gtags-action-openfile (_elm)
   (let* ((elm (helm-get-selection nil 'withprop))
@@ -344,7 +357,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
          (line (string-to-number (second elems)))
          (open-func (helm-gtags-select-find-file-func))
          (default-directory (or (get-text-property 0 'default-directory elm) (helm-gtags-searched-directory))))
-    (helm-gtags-do-open-file open-func filename line)))
+    (helm-gtags-do-open-file open-func filename line)
+    (helm-gtags-goto-tag-pos)))
 
 (defun helm-gtags-select-find-file-func()
   (if helm-gtags-use-otherwin
