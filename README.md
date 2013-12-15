@@ -128,14 +128,11 @@ helm-input-idle-delay for helm-gtags
 ### History Navigate Feature 
 do not support history navigate feature directly.
 if you want this feature, you just need use
-helm-gtags-select-before-hook and helm-gtags-goto-line-before-hook hooks,
+helm-gtags-select-before-hook and helm-gtags-goto-line-before-hook
 
 #### for eaxmple using bm.el helm-bm.el
 
-https://github.com/joodland/bm (origin )
-
-https://github.com/jixiuf/bm (my fork support cycle in LIFO order )
-
+https://github.com/joodland/bm 
 https://github.com/jixiuf/helm-bm
 
 you just need this lines:
