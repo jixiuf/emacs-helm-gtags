@@ -64,7 +64,7 @@
 
 (declare-function pulse-momentary-highlight-one-line "pulse")
 (declare-function pulse-momentary-highlight-region "pulse")
-(declare-function some "cl")
+(declare-function cl-some "cl-extra")
 
 (defgroup helm-gtags nil
   "GNU GLOBAL for helm"
@@ -497,7 +497,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
            (or (null buf-filename)
                (and (equal major-mode mode)
                     (string-equal input cache-input)
-                    (some
+                    (cl-some
                      '(lambda (dir)
                         (string-match (regexp-quote dir)
                                       (file-truename buf-filename))) cache-dirs)))))
