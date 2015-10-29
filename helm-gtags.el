@@ -675,6 +675,11 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
                                                       (read-directory-name "Generate GTAGS at directory:"))))))
        ;; on windows "gtags  d:/.emacs.d"  works , but "gtags d:/.emacs.d/" doesn't
        (cons helm-gtags-cmd (list dir))))
+    (64                                 ;C-uC-uC-u
+     (let* ((dir (file-truename (directory-file-name (expand-file-name
+                                                      (read-directory-name "Generate GTAGS at directory(using --gtagslabel=ctags):"))))))
+       ;; on windows "gtags  d:/.emacs.d"  works , but "gtags d:/.emacs.d/" doesn't
+       (cons helm-gtags-cmd (list "--gtagslabel=ctags" dir))))
     (t
      (cons helm-gtags-global-cmd
            (list "-u" (format "--single-update=%s" (file-truename (buffer-file-name))))))))
@@ -700,16 +705,19 @@ Generate new TAG file in selected directory with `C-uC-u'"
                         cmd params)))
       (set-process-query-on-exit-flag proc nil) ;neednot query when quit emacs
       (setq helm-gtags-last-update-time (float-time (current-time)));;update time
-      (unless proc (message "Failed to update GNU Global TAGS" )
-              (kill-buffer helm-gtags-update-tmp-buf))
+      (unless proc
+        (message "Failed to update GNU Global TAGS %s"
+                 (with-current-buffer (process-buffer process)(buffer-string )))
+        (kill-buffer helm-gtags-update-tmp-buf))
       (set-process-sentinel proc 'helm-gtags--update-tags-sentinel))))
 
 (defun helm-gtags--update-tags-sentinel (process state)
   (when (eq (process-status process) 'exit)
-    (kill-buffer helm-gtags-update-tmp-buf)
     (if (zerop (process-exit-status process))
         (message "Update TAGS successfully")
-      (message "Failed to update TAGS"))))
+      (message "Failed to update GNU Global TAGS %s"
+               (with-current-buffer (process-buffer process)(buffer-string ))))
+    (kill-buffer helm-gtags-update-tmp-buf)))
 
 
 (defvar helm-gtags-mode-name " HGtags")
