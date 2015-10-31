@@ -710,14 +710,18 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   (cl-case (prefix-numeric-value current-prefix-arg)
     (4 'entire-update)
     (16 'generate-other-directory)
-    (64 'generate-other-directory-ctags-flags)
     (otherwise 'single-update)))
+
+(defsubst helm-gtags-read-gtagslabel ()
+  (let ((labels '("--gtagslabel=default" "--gtagslabel=native"
+                 "--gtagslabel=ctags"  "--gtagslabel=pygments")))
+    (completing-read "GTAGS LABEL(Default: default): "
+                     labels nil t nil nil "--gtagslabel=default")))
 
 (defun helm-gtags-update-tags-command (how-to)
   (cl-case how-to
     (entire-update '("global" "-u"))
-    (generate-other-directory (list "gtags" (helm-gtags-read-tag-directory)))
-    (generate-other-directory-ctags-flags (list "gtags" "--gtagslabel=ctags" (helm-gtags-read-tag-directory)))
+    (generate-other-directory (list "gtags" (helm-gtags-read-gtagslabel) (helm-gtags-read-tag-directory)))
     (single-update (list "global" "--single-update" (helm-gtags-real-file-name)))))
 
 (defun helm-gtags-update-tags-p (how-to interactive-p current-time)
