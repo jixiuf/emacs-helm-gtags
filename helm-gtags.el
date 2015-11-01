@@ -7,7 +7,7 @@
 ;; 纪秀峰 fork version
 ;; URL: https://github.com/jixiuf/emacs-helm-gtags
 ;; Author: 纪秀峰 <jixiuf@gmail.com>
-;; Version: 2.1
+;; Version: 2.2
 ;; Package-Requires: ((helm "1.8"))
 
 ;; This program is free software; you can redistribute it and/or modify
