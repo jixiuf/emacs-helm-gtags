@@ -88,8 +88,9 @@
   :type 'boolean
   :group 'helm-gtags)
 
-(defcustom helm-gtags-auto-update nil
-  "*If non-nil, tag files are updated whenever a file is saved."
+(defcustom helm-gtags-auto-update t
+  "*If non-nil, tag files are updated whenever a file is saved.
+you need enable `helm-gtags-mode'"
   :type 'boolean
   :group 'helm-gtags)
 

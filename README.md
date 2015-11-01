@@ -97,8 +97,8 @@ then
   `helm-gtags-find-tag-from-here`
   `helm-gtags-find-files`
   `helm-gtags-complete`
-could find tag rtags symbol files in several directory with one command
-with prefix C-u :using other window
+could find tag rtags symbol files in several directory with one command.
+with prefix C-u :using other window.
 with prefix C-uC-u :do not use symbol-at-point as default input.
 #### `helm-gtags-path-style`
 
@@ -210,6 +210,9 @@ you just need this lines:
 (eval-after-load "helm-gtags" '(add-to-list 'helm-for-files-preferred-list helm-source-gtags-files t))
 
 ;; key bindings
+;;with prefix C-u :using other window.
+;;with prefix C-uC-u :do not use symbol-at-point as default input.
+
     (add-hook 'helm-gtags-mode-hook
               '(lambda ()
                  (local-set-key [(meta return)] 'helm-gtags-complete)
