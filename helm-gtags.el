@@ -450,6 +450,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
                     (format "Searched %s at %s" (or (helm-attr 'init-name src) "")
                             (mapconcat 'identity custom-dirs "  "))
                     src))
+    (helm-gtags-check-tags-exists)
     (run-hooks 'helm-gtags-select-before-hook)
     (helm :sources srcs
           :input (or input (thing-at-point 'symbol))
@@ -683,6 +684,7 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
                         helm-gtags-parsed-file)
                 helm-source-gtags-parse-file)
   ;; (helm-execute-action-at-once-if-one t)
+  (helm-gtags-check-tags-exists)
   (let ((helm-quit-if-no-candidate #'(lambda()
                                        (with-current-buffer helm-current-buffer
                                          (run-hooks 'helm-gtags-quit-or-no-candidates-hook))
@@ -692,6 +694,20 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
     (when (eq 1 helm-exit-status)
       (run-hooks 'helm-gtags-quit-or-no-candidates-hook))))
 
+
+(defun helm-gtags-check-tags-exists()
+  (or (getenv "GTAGSROOT")
+      (locate-dominating-file default-directory "GTAGS")
+      (if (not (yes-or-no-p "File GTAGS not found. generate now? "))
+          (user-error "Abort")
+        (let* ((tagroot (read-directory-name "Generate tags at Directory: "))
+               (label (helm-gtags-read-gtagslabel))
+               (default-directory tagroot))
+          (message "gtags is generating tags....")
+          (if (zerop (process-file "gtags" nil nil nil "-q" label))
+              (message "generating tags done!!!")
+            (error "Faild: 'gtags -q'"))
+          tagroot))))
 
 (defun helm-gtags-real-file-name ()
   (let ((buffile (buffer-file-name)))
