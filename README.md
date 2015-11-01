@@ -98,6 +98,8 @@ then
   `helm-gtags-find-files`
   `helm-gtags-complete`
 could find tag rtags symbol files in several directory with one command
+with prefix C-u :using other window
+with prefix C-uC-u :do not use symbol-at-point as default input.
 #### `helm-gtags-path-style`
 
 File path style, `'root` or `'relative` or `'absolute`(Default is `'root`)

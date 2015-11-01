@@ -388,7 +388,9 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (find-file file)))
 
 (defsubst helm-gtags--using-other-window-p ()
-  (< (prefix-numeric-value current-prefix-arg) 0))
+  (= (prefix-numeric-value current-prefix-arg) 4))
+(defsubst helm-gtags--read-input-p ()
+  (= (prefix-numeric-value current-prefix-arg) 16))
 
 (defun helm-gtags-open-file-other-window (file readonly)
   (setq helm-gtags-use-otherwin nil)
@@ -443,6 +445,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (custom-dirs (helm-gtags-get-tag-location-alist major-mode))
         (src (car srcs)))
     (when (helm-gtags--using-other-window-p) (setq helm-gtags-use-otherwin t))
+    (when (helm-gtags--read-input-p) (setq helm-execute-action-at-once-if-one nil))
     (dolist (src srcs)
       (when (symbolp src) (setq src (symbol-value src)))
       (unless (helm-attr 'init-name src) (helm-attrset 'init-name  (helm-attr 'name src) src))
