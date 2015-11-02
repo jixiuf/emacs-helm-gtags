@@ -7,7 +7,7 @@
 ;; 纪秀峰 fork version
 ;; URL: https://github.com/jixiuf/emacs-helm-gtags
 ;; Author: 纪秀峰 <jixiuf@gmail.com>
-;; Version: 2.2
+;; Version: 2.3
 ;; Package-Requires: ((helm "1.8"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -163,6 +163,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defvar helm-gtags-parsed-file nil)
 
 (defvar helm-gtags-update-tmp-buf " *helm-gtags-update TAGS*")
+(defvar helm-gtags-eldoc-tmp-buf " *helm-gtags-eldoc*")
 
 (defvar helm-gtags-tag-cache nil)
 (defvar helm-gtags-rtag-cache nil)
@@ -784,7 +785,56 @@ Generate new TAG file in selected directory with `C-u C-u'"
     (kill-buffer (process-buffer proc))))
 
 
+(defvar-local helm-gtags-eldoc-cache nil)  ;(tagname . taginfo)
+(declare-function eldoc-message "eldoc")
 
+(defsubst helm-gtags-print-definition-function(token s)
+  (setq helm-gtags-eldoc-cache (list token s))
+  (print helm-gtags-eldoc-cache)
+  (eldoc-message s))
+(defsubst helm-gtags-build-eldoc-tmp-buf-name(token)
+  (concat helm-gtags-eldoc-tmp-buf "^" token))
+(defsubst helm-gtags-get-token-from-tmp-buf-name(buffer)
+  (nth 1 (split-string (buffer-name buffer) "\\^")))
+;; line =/Users/jixiuf/repos/emacs/src/w32term.h:82:struct w32_display_info
+;; (helm-gtags-get-taginfo-from-grep-result "c:\\a:82:struct w32_display_info")
+;; return struct w32_display_info
+(defsubst helm-gtags-get-taginfo-from-grep-result(line)
+  (let ((tokens (split-string line ":")))
+    (if (> (length tokens) 2)
+        (nth (1- (length tokens)) tokens)
+      "")))
+
+(defun helm-gtags-eldoc-function()
+  "A function suitable for `eldoc-documentation-function' (which see)."
+  (let ((token (thing-at-point 'symbol)))
+    (if (equal token (car helm-gtags-eldoc-cache))
+        (progn
+          (cadr helm-gtags-eldoc-cache)
+          )
+      (when token
+        ;; Prevent multiple runs of ggtags-show-definition
+        ;; for the same tag.
+        (setq helm-gtags-eldoc-cache (list token))
+
+        (let* ((proc (apply 'start-file-process "helm-gtags-eldoc"
+                            (get-buffer-create (helm-gtags-build-eldoc-tmp-buf-name token))
+                            helm-gtags-global-cmd (list "--result=grep" token))))
+          (set-process-sentinel proc 'helm-gtags-eldoc-sentinel)
+          (set-process-query-on-exit-flag proc nil))))))
+
+
+(defun helm-gtags-eldoc-sentinel(proc _event)
+  (when (eq (process-status proc) 'exit)
+    (when (zerop (process-exit-status proc))
+      (let ((token (helm-gtags-get-token-from-tmp-buf-name (current-buffer)))
+            (tag-eldoc))
+        (with-current-buffer (process-buffer proc)
+          (goto-char (point-min))
+          (setq tag-eldoc  (helm-gtags-get-taginfo-from-grep-result
+                            (buffer-substring (point-min) (line-end-position)))))
+        (helm-gtags-print-definition-function token tag-eldoc)))
+    (kill-buffer (process-buffer proc))))
 
 (defvar helm-gtags-mode-name " HGtags")
 (defvar helm-gtags-mode-map (make-sparse-keymap))
@@ -799,12 +849,18 @@ Generate new TAG file in selected directory with `C-u C-u'"
   :lighter    helm-gtags-mode-name
   (if helm-gtags-mode
       (progn
+        ;; Work around http://debbugs.gnu.org/19324
+        (or eldoc-documentation-function
+            (setq-local eldoc-documentation-function #'ignore))
+        (add-function :after-until (local 'eldoc-documentation-function)
+                      #'helm-gtags-eldoc-function '((name . helm-gtags-eldoc-function)
+                                                    (depth . -100)))
         (run-hooks 'helm-gtags-mode-hook)
         (when helm-gtags-auto-update
           (add-hook 'after-save-hook 'helm-gtags-update-tags nil t)))
-    (progn
-      (when helm-gtags-auto-update
-        (remove-hook 'after-save-hook 'helm-gtags-update-tags t)))))
+    (remove-function (local 'eldoc-documentation-function) 'helm-gtags-eldoc-function)
+    (when helm-gtags-auto-update
+      (remove-hook 'after-save-hook 'helm-gtags-update-tags t))))
 
 (provide 'helm-gtags)
 
