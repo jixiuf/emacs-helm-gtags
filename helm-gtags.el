@@ -138,6 +138,10 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   ""
   :group 'helm-gtags
   :type 'hook)
+(defcustom helm-gtags-goto-line-after-hook nil
+  ""
+  :group 'helm-gtags
+  :type 'hook)
 
 (defcustom helm-gtags-quit-or-no-candidates-hook nil
   ""
@@ -381,7 +385,8 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (funcall open-func file helm-gtags-read-only)
   (goto-char (point-min))
   (forward-line (1- line))
-  (back-to-indentation))
+  (back-to-indentation)
+  (run-hooks 'helm-gtags-goto-line-after-hook))
 
 (defun helm-gtags-open-file (file readonly)
   (if readonly

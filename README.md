@@ -150,6 +150,10 @@ you just need this lines:
    (require 'helm-gtags)
    (autoload 'bm-bookmark-add "bm" "Add bookmark at current line.")
    (add-hook 'helm-gtags-goto-line-before-hook 'bm-bookmark-add)
+
+   (add-hook 'helm-gtags-quit-or-no-candidates-hook 'bm-bookmark-remove) ;if jump fail ,remove the unnecessary bookmark 
+   (add-hook 'helm-gtags-goto-line-after-hook 'bm-bookmark-remove) ;after jump ,if there is a bookmark there,remove it if you want
+
    ;;; and other helm-gtags.el configuration
 
 
