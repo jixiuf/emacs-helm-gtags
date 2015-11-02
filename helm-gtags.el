@@ -703,6 +703,11 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
     (when (eq 1 helm-exit-status)
       (run-hooks 'helm-gtags-quit-or-no-candidates-hook))))
 
+(defsubst helm-gtags-read-gtagslabel ()
+  (let ((labels '("--gtagslabel=default" "--gtagslabel=native"
+                 "--gtagslabel=ctags"  "--gtagslabel=pygments")))
+    (completing-read "GTAGS LABEL(Default: default): "
+                     labels nil t nil nil "--gtagslabel=default")))
 
 (defun helm-gtags-check-tags-exists()
   (or (getenv "GTAGSROOT")
@@ -737,11 +742,6 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
     (16 'generate-other-directory)
     (otherwise 'single-update)))
 
-(defsubst helm-gtags-read-gtagslabel ()
-  (let ((labels '("--gtagslabel=default" "--gtagslabel=native"
-                 "--gtagslabel=ctags"  "--gtagslabel=pygments")))
-    (completing-read "GTAGS LABEL(Default: default): "
-                     labels nil t nil nil "--gtagslabel=default")))
 
 (defun helm-gtags-update-tags-command (how-to)
   (cl-case how-to
@@ -774,15 +774,15 @@ Generate new TAG file in selected directory with `C-u C-u'"
           (set-process-sentinel proc 'helm-gtags-update-gtags-sentinel)
           (setq helm-gtags-last-update-time current-time))))))
 
-(defun helm-gtags-update-gtags-sentinel(process _event)
-  (when (eq (process-status process) 'exit)
-    (if (zerop (process-exit-status process))
+(defun helm-gtags-update-gtags-sentinel(proc _event)
+  (when (eq (process-status proc) 'exit)
+    (if (zerop (process-exit-status proc))
         (message "Success: update GNU Global TAGS" )
       (message "Failed: update GNU Global TAGS(%s)"
-               (with-current-buffer (process-buffer process)(buffer-string))))
-    (set-process-query-on-exit-flag process nil)
-    (kill-buffer helm-gtags-update-tmp-buf)
-    ))
+               (with-current-buffer (process-buffer proc)(buffer-string))))
+    (set-process-query-on-exit-flag proc nil)
+    (kill-buffer (process-buffer proc))))
+
 
 
 
