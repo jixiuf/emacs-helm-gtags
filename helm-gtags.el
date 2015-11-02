@@ -762,7 +762,8 @@ Generate new TAG file in selected directory with `C-u C-u'"
         (current-time (float-time (current-time))))
     (when (helm-gtags-update-tags-p how-to interactive-p current-time)
       (let* ((cmds (helm-gtags-update-tags-command how-to))
-             (proc (apply 'start-file-process "helm-gtags-update-tag" nil cmds)))
+             (proc (apply 'start-file-process "helm-gtags-update-tag"
+                          (get-buffer-create helm-gtags-update-tmp-buf) cmds)))
         (if (not proc)
             (message "Failed: %s" (mapconcat 'identity cmds " "))
           (set-process-sentinel proc 'helm-gtags-update-gtags-sentinel)
@@ -772,7 +773,11 @@ Generate new TAG file in selected directory with `C-u C-u'"
   (when (eq (process-status process) 'exit)
     (if (zerop (process-exit-status process))
         (message "Success: update GNU Global TAGS" )
-      (message "Failed: update GNU Global TAGS(%d)"  (process-exit-status process)))))
+      (message "Failed: update GNU Global TAGS(%s)"
+               (with-current-buffer (process-buffer process)(buffer-string))))
+    (set-process-query-on-exit-flag process nil)
+    (kill-buffer helm-gtags-update-tmp-buf)
+    ))
 
 
 
