@@ -71,6 +71,11 @@
   "GNU GLOBAL for helm"
   :group 'helm)
 
+(defcustom helm-gtags-debug nil
+  ""
+  :type 'string
+  :group 'helm-gtags)
+
 (defcustom helm-gtags-path-style 'root
   "Style of file path"
   :type '(choice (const :tag "Root of the current project" root)
@@ -185,10 +190,13 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (:parse-file . " *helm-gtags-tags-parse-file*")))
 
 (defvar helm-gtags-command-option-alist
-  '((:tag    . "")
-    (:rtag   . "-r")
-    (:symbol . "-s")
-    (:file   . "-Poa")))
+  '((:rtag   . "--reference")
+    (:completion . "--completion")
+    (:symbol . "--symbol")
+    (:file   . "-Po")))
+
+(defsubst helm-gtags-type-is-not-file-p (type)
+  (not (eq type :file)))
 
 (defun helm-gtags-set-tag-location-alist(key value)
   (let ((kv (assoc key  helm-gtags-tag-location-alist)))
@@ -215,8 +223,35 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
                (car bound) (point))
       "")))
 
-(defsubst helm-gtags-type-is-not-file-p (type)
-  (not (eq type :file)))
+(defsubst helm-gtags-windows-p ()
+  (memq system-type '(windows-nt ms-dos)))
+
+;; Work around for GNU global Windows issue
+(defsubst helm-gtags-use-abs-path-p (gtagslibpath)
+  (and (helm-gtags-windows-p) gtagslibpath))
+
+(defun helm-gtags-construct-option (type &optional in)
+  (let (options
+        (type-opt (assoc-default type helm-gtags-command-option-alist))
+        (gtagslibpath (getenv "GTAGSLIBPATH")))
+    (when in (push in options))
+    (helm-aif type-opt (push it options))
+    (unless  (eq type :file)
+      (push "--result=grep" options))
+    (when helm-gtags-ignore-case
+      (push "--ignore-case" options))
+    (when (or (eq helm-gtags-path-style 'absolute)
+              (helm-gtags-use-abs-path-p gtagslibpath))
+      (push "--absolute" options))
+    (when gtagslibpath (push "--through" options))
+    options))
+
+
+(defun helm-gtags-construct-command (type  &optional in)
+  (let ((input (or in (car (helm-mm-split-pattern helm-pattern)))))
+    (when (and (string= input "") (helm-gtags-type-is-not-file-p type))
+      (error "Input is empty!!"))
+    (helm-gtags-construct-option type input)))
 
 (defun helm-gtags-local-file-name ()
   (let ((buffile (buffer-file-name)))
@@ -274,17 +309,21 @@ and return the dirs"
     dirs))
 
 (defun helm-source-gtags-complete-init()
-  (let ((dirs (helm-gtags-get-tag-location-alist major-mode))
-        (prefix (helm-gtags-token-at-point))
-        (mode major-mode)
-        (default-directory default-directory)
-        begin)
+  (let* ((dirs (helm-gtags-get-tag-location-alist major-mode))
+         (prefix (helm-gtags-token-at-point))
+         (mode major-mode)
+         (default-directory default-directory)
+         (cmd-options (helm-gtags-construct-command :completion prefix))
+         begin)
     (with-current-buffer (helm-candidate-buffer 'global)
       (dolist (dir dirs)
         (setq default-directory dir)
         (goto-char (point-max))
         (setq begin (point))
-        (unless (zerop (process-file helm-gtags-global-cmd nil (current-buffer) nil "-c" prefix))
+        (when helm-gtags-debug
+          (message "[helm-gtags]:[%s %s] in directory:%s"
+                   helm-gtags-global-cmd (mapconcat 'identity cmd-options " ") dir))
+        (unless (zerop (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil cmd-options))
           (when (string-match "global: GTAGS not found." (buffer-substring-no-properties begin (point)))
             (helm-gtags-set-tag-location-alist mode (delete dir dirs)))
           (delete-region begin (point)))))))
@@ -320,6 +359,9 @@ and return the dirs"
     (with-current-buffer candidates-buf
       (setq default-directory dir)
       (erase-buffer)
+      (when helm-gtags-debug
+        (message "[helm-gtags]:[%s --result=grep  %s %s] in directory:%s"
+                 helm-gtags-global-cmd from-here token dir))
       (process-file helm-gtags-global-cmd nil (current-buffer) nil
                     "--result=grep" from-here token))
     candidates-buf))
@@ -328,22 +370,6 @@ and return the dirs"
   (helm-gtags-candidates-in-buffer
    (helm-gtags-find-tag-from-here-cands-cmd)))
 
-(defun helm-gtags-construct-option (type &optional comp)
-  (let ((type-opt (assoc-default type helm-gtags-command-option-alist))
-        (result-opt (or (and (eq type :file) "") "--result=grep"))
-        (abs-opt (or (and (eq helm-gtags-path-style 'absolute) "-a") ""))
-        (case-opt (or (and helm-gtags-ignore-case "-i") ""))
-        (comp-opt (or (and comp "-c") ""))
-        (local-opt (or (and current-prefix-arg
-                            (helm-gtags-type-is-not-file-p type) "-l") "")))
-    (delete "" (list result-opt comp-opt type-opt abs-opt case-opt local-opt))))
-
-(defun helm-gtags-construct-command (type dir &optional in)
-  (let ((input (or in (car (helm-mm-split-pattern helm-pattern)))) ;
-        (option (helm-gtags-construct-option type)))
-    (when (and (string= input "") (helm-gtags-type-is-not-file-p type))
-      (error "Input is empty!!"))
-    (append option (list input))))
 
 (defun helm-gtags-candidates-in-buffer-parse-file()
   (helm-gtags-candidates-in-buffer
@@ -355,6 +381,9 @@ and return the dirs"
     (with-current-buffer candidates-buf
       (erase-buffer)
       (setq default-directory dir)
+      (when helm-gtags-debug
+        (message "[helm-gtags]:[%s --result cscope -f %s] in directory:%s"
+                   helm-gtags-global-cmd helm-gtags-parsed-file dir))
       (unless (zerop (process-file helm-gtags-global-cmd nil (current-buffer) nil
                                    "--result" "cscope" "-f" helm-gtags-parsed-file))
         (error "Failed: global --result cscope -f \"%s\"" helm-gtags-parsed-file)))
@@ -501,8 +530,13 @@ and return the dirs"
             (coding-system-for-read buf-coding)
             (coding-system-for-write buf-coding))
         (dolist (dir dirs)
-          (setq cmd-options (helm-gtags-construct-command type dir input))
           (setq default-directory dir)
+          (setq cmd-options (helm-gtags-construct-command type  input))
+          (when helm-gtags-debug
+            (message "[helm-gtags]:[%s %s] in directory:%s"
+                     helm-gtags-global-cmd
+                     (mapconcat 'identity cmd-options " ") dir))
+
           (setq tramp-remote-base (file-remote-p dir))
           (insert
            (with-temp-buffer
@@ -731,9 +765,9 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
 
 (defun helm-gtags-update-tags-command (how-to)
   (cl-case how-to
-    (entire-update '("global" "-u"))
-    (generate-other-directory (list "gtags" (helm-gtags-read-gtagslabel) (helm-gtags-read-tag-directory)))
-    (single-update (list "global" "--single-update" (helm-gtags-local-file-name)))))
+    (entire-update (list helm-gtags-global-cmd "-u"))
+    (generate-other-directory (list helm-gtags-cmd (helm-gtags-read-gtagslabel) (helm-gtags-read-tag-directory)))
+    (single-update (list helm-gtags-global-cmd "--single-update" (helm-gtags-local-file-name)))))
 
 (defun helm-gtags-update-tags-p (how-to interactive-p current-time)
   (or interactive-p
@@ -752,11 +786,15 @@ Generate new TAG file in selected directory with `C-u C-u'"
         (interactive-p (called-interactively-p 'interactive))
         (current-time (float-time (current-time))))
     (when (helm-gtags-update-tags-p how-to interactive-p current-time)
-      (let* ((cmds (helm-gtags-update-tags-command how-to))
+      (let* ((cmd-options (helm-gtags-update-tags-command how-to))
              (proc (apply 'start-file-process "helm-gtags-update-tag"
-                          (get-buffer-create helm-gtags-update-tmp-buf) cmds)))
+                          (get-buffer-create helm-gtags-update-tmp-buf) cmd-options)))
+        (when helm-gtags-debug
+          (message "[helm-gtags]:[%s] in directory:%s"
+                     (mapconcat 'identity cmd-options " ") default-directory)
+          )
         (if (not proc)
-            (message "Failed: %s" (mapconcat 'identity cmds " "))
+            (message "Failed: %s" (mapconcat 'identity cmd-options " "))
           (set-process-sentinel proc 'helm-gtags-update-gtags-sentinel)
           (setq helm-gtags-last-update-time current-time))))))
 
