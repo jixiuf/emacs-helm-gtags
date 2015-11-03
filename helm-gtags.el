@@ -209,6 +209,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (delete-region (car bound) (cdr bound)))))
 
 (defun helm-gtags-token-at-point ()
+  "token before point"
   (let ((bound (bounds-of-thing-at-point 'symbol)))
     (if bound (buffer-substring-no-properties
                (car bound) (point))
@@ -217,54 +218,67 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defsubst helm-gtags-type-is-not-file-p (type)
   (not (eq type :file)))
 
-(defun helm-gtags-find-tag-directory()
-  (let((mode major-mode)
-       (dirs (helm-gtags-get-tag-location-alist major-mode)))
-    (with-temp-buffer
-      (let ((status (process-file helm-gtags-global-cmd nil  (current-buffer) nil  "-p"))
-            tag-location)
-        (if (zerop status)
-            (let ((tagroot (buffer-substring
-                            (goto-char (point-min)) (line-end-position)))
-                  (remote-base )
-                  )
-              (setq tag-location (file-name-as-directory tagroot))
-              (setq remote-base (file-remote-p default-directory))
-              (when remote-base
-                  (setq tag-location (concat remote-base tag-location))
-                  )
-              (add-to-list 'dirs  tag-location)
-              (helm-gtags-set-tag-location-alist mode dirs)
-              tag-location
-              )nil)))))
+(defun helm-gtags-local-file-name ()
+  (let ((buffile (buffer-file-name)))
+    (unless buffile
+      (error "This buffer is not related to file."))
+    (if (file-remote-p buffile)
+        (tramp-file-name-localname (tramp-dissect-file-name buffile))
+      (file-truename buffile))))
 
-(defun helm-gtags-searched-directory(&optional nosearch default)
-  (let((buf-filename (buffer-file-name))
-       (dirs (helm-gtags-get-tag-location-alist major-mode))
-       (i 0) tagroot dir found)
-    (if (null buf-filename)
-        (or default (file-truename (expand-file-name default-directory)))
-      (while (and (< i (length dirs))
-                  (null tagroot))
-        (setq dir (nth i dirs))
-        (when (string-match (regexp-quote dir) (file-truename buf-filename))
-          (setq tagroot dir))
-        (setq i (1+ i)))
-      (if tagroot tagroot
-        (if nosearch (or default (file-truename (expand-file-name default-directory)))
-          (or (helm-gtags-find-tag-directory)
-              (or default (file-truename (expand-file-name default-directory)))))))))
+(defsubst helm-gtags-read-gtagslabel ()
+  (let ((labels '("--gtagslabel=default" "--gtagslabel=native"
+                 "--gtagslabel=ctags"  "--gtagslabel=pygments")))
+    (completing-read "GTAGS LABEL(Default: default): "
+                     labels nil t nil nil "--gtagslabel=default")))
+
+(defun helm-gtags-check-tags-exists()
+  (or (helm-gtags-find-tagroot)
+      (if (not (yes-or-no-p "File GTAGS not found. generate now? "))
+          (user-error "Abort")
+        (let* ((tagroot (read-directory-name "Generate tags at Directory: "))
+               (label (helm-gtags-read-gtagslabel))
+               (default-directory tagroot))
+          (message "gtags is generating tags....")
+          (if (zerop (process-file "gtags" nil nil nil "-q" label))
+              (message "generating tags done!!!")
+            (error "Faild: 'gtags -q'"))
+          tagroot))))
+
+(defun helm-gtags-find-tagroot(&optional with-process-p)
+  "return nil or tag root dir.
+if `with-process-p' not nil then use global -p find gtagsroot"
+  (helm-aif (or (getenv "GTAGSROOT") (locate-dominating-file default-directory "GTAGS"))
+      (file-truename it)
+    (and with-process-p
+         (with-temp-buffer
+           (when (zerop (process-file helm-gtags-global-cmd nil (current-buffer) nil "-p"))
+             (let (tag-location
+                   (tagroot (buffer-substring-no-properties
+                             (goto-char (point-min)) (line-end-position))))
+               (setq tag-location (file-name-as-directory tagroot))
+               (helm-aif (file-remote-p default-directory)
+                   (setq tag-location (concat it tag-location)))
+               tag-location))))))
+
+(defun helm-gtags-move-tagroot-first(&optional majormode)
+  "make sure current tagroot is the first element of dirs if exists.
+and return the dirs"
+  (let*((mode (or majormode major-mode))
+       (dirs (helm-gtags-get-tag-location-alist mode))
+       (tagroot (helm-gtags-find-tagroot t)))
+    (when tagroot
+      (setq dirs (delete tagroot dirs))
+      (add-to-list 'dirs  tagroot)      ;insert at header
+      (helm-gtags-set-tag-location-alist mode dirs))
+    dirs))
 
 (defun helm-source-gtags-complete-init()
   (let ((dirs (helm-gtags-get-tag-location-alist major-mode))
-        (dir (helm-gtags-searched-directory nil nil))
         (prefix (helm-gtags-token-at-point))
         (mode major-mode)
         (default-directory default-directory)
         begin)
-    (when dir (add-to-list 'dirs dir))
-    (helm-gtags-set-tag-location-alist major-mode dirs)
-
     (with-current-buffer (helm-candidate-buffer 'global)
       (dolist (dir dirs)
         (setq default-directory dir)
@@ -372,7 +386,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
          (filename (or (get-text-property 0 'filename elm) (car elems)))
          (line (string-to-number (cadr elems)))
          (open-func (helm-gtags-select-find-file-func))
-         (default-directory (or (get-text-property 0 'default-directory elm) (helm-gtags-searched-directory))))
+         (default-directory (or (get-text-property 0 'default-directory elm) (helm-gtags-find-tagroot))))
     (helm-gtags-do-open-file open-func filename line)
     (helm-gtags-goto-tag-pos)))
 
@@ -434,7 +448,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
          (filename (or (get-text-property 0 'filename c) (car elems)))
          (line (string-to-number (cadr elems)))
          (default-directory (or (get-text-property 0 'default-directory c)
-                                (helm-gtags-searched-directory))))
+                                (helm-gtags-find-tagroot))))
     (find-file filename)
     (goto-char (point-min))
     (forward-line (1- line))
@@ -449,7 +463,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
         (helm-input-idle-delay helm-gtags-input-idle-delay)
         (helm-execute-action-at-once-if-one t)
         (buf (get-buffer-create helm-gtags-buffer))
-        (custom-dirs (helm-gtags-get-tag-location-alist major-mode))
+        (custom-dirs (helm-gtags-move-tagroot-first major-mode))
         (src (car srcs)))
     (when (helm-gtags--using-other-window-p) (setq helm-gtags-use-otherwin t))
     (when (helm-gtags--read-input-p) (setq helm-execute-action-at-once-if-one nil))
@@ -472,13 +486,10 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   (let ((candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
         ;; (cache-info (assoc-default type helm-gtags-cache-alist))
         (buf-coding buffer-file-coding-system)
-        mode cmd-options dirs dir)
+        mode cmd-options dirs)
     (with-current-buffer helm-current-buffer
       (setq mode major-mode)
-      (setq dir (helm-gtags-searched-directory nil nil))
       (setq dirs (helm-gtags-get-tag-location-alist mode))
-      (when dir (add-to-list 'dirs dir))
-      (helm-gtags-set-tag-location-alist mode dirs)
       (cl-case type
         (:file  (setf (cdr (assoc type helm-gtags-cache-alist)) (list mode input dirs)))
         (otherwise (setf (cdr (assoc type helm-gtags-cache-alist)) (list mode input)))))
@@ -548,7 +559,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (if (and cache-info (bufferp candidates-buf)(buffer-live-p candidates-buf)
              (helm-gtags-use-cache-p type input cache-info))
         ;; (helm-gtags-exec-global-cmd type input) ;
-      candidates-buf
+        candidates-buf
       (helm-gtags-exec-global-cmd type input))))
 
 (defun helm-gtags-candidates-in-buffer-rtag(&optional in)
@@ -704,33 +715,7 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
     (when (eq 1 helm-exit-status)
       (run-hooks 'helm-gtags-quit-or-no-candidates-hook))))
 
-(defsubst helm-gtags-read-gtagslabel ()
-  (let ((labels '("--gtagslabel=default" "--gtagslabel=native"
-                 "--gtagslabel=ctags"  "--gtagslabel=pygments")))
-    (completing-read "GTAGS LABEL(Default: default): "
-                     labels nil t nil nil "--gtagslabel=default")))
 
-(defun helm-gtags-check-tags-exists()
-  (or (getenv "GTAGSROOT")
-      (locate-dominating-file default-directory "GTAGS")
-      (if (not (yes-or-no-p "File GTAGS not found. generate now? "))
-          (user-error "Abort")
-        (let* ((tagroot (read-directory-name "Generate tags at Directory: "))
-               (label (helm-gtags-read-gtagslabel))
-               (default-directory tagroot))
-          (message "gtags is generating tags....")
-          (if (zerop (process-file "gtags" nil nil nil "-q" label))
-              (message "generating tags done!!!")
-            (error "Faild: 'gtags -q'"))
-          tagroot))))
-
-(defun helm-gtags-real-file-name ()
-  (let ((buffile (buffer-file-name)))
-    (unless buffile
-      (error "This buffer is not related to file."))
-    (if (file-remote-p buffile)
-        (tramp-file-name-localname (tramp-dissect-file-name buffile))
-      (file-truename buffile))))
 
 (defun helm-gtags-read-tag-directory ()
   (let ((dir (read-directory-name "Directory tag generated: " nil nil t)))
@@ -748,7 +733,7 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   (cl-case how-to
     (entire-update '("global" "-u"))
     (generate-other-directory (list "gtags" (helm-gtags-read-gtagslabel) (helm-gtags-read-tag-directory)))
-    (single-update (list "global" "--single-update" (helm-gtags-real-file-name)))))
+    (single-update (list "global" "--single-update" (helm-gtags-local-file-name)))))
 
 (defun helm-gtags-update-tags-p (how-to interactive-p current-time)
   (or interactive-p
@@ -790,7 +775,6 @@ Generate new TAG file in selected directory with `C-u C-u'"
 
 (defsubst helm-gtags-print-definition-function(token s)
   (setq helm-gtags-eldoc-cache (list token s))
-  (print helm-gtags-eldoc-cache)
   (eldoc-message s))
 (defsubst helm-gtags-build-eldoc-tmp-buf-name(token)
   (concat helm-gtags-eldoc-tmp-buf "^" token))
