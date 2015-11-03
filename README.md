@@ -75,12 +75,14 @@ any files with `C-u` prefix.
 
 ## Customize Variables
 
-### `helm-gtags-tag-location-alist`
+### `helm-gtags-GTAGSLIBPATH-alist`
 You could add your lib directory here ,like
 ```
-(setq helm-gtags-tag-location-alist
-      '((c-mode  "/usr/include/" "/usr/kernel/")
-        (c++-mode  "/path/of/tag/2/" "/path/of/tag/3/")))
+(setq helm-gtags-GTAGSLIBPATH-alist
+      '(("/path/to/project1"  "/usr/include/" "/usr/kernel/")
+        ("/path/to/project2" "/path/of/tag/2/" "/path/of/tag/3/")))
+"/path/to/project1" and "/path/to/project2" can NOT ends with /
+
 you neednot set this if you just use one tag
 
 ```
