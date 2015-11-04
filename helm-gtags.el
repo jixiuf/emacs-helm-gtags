@@ -176,11 +176,13 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defvar helm-gtags-rtag-cache nil)
 (defvar helm-gtags-symbol-cache nil)
 (defvar helm-gtags-file-cache nil)
+(defvar helm-gtags-from-here-cache nil)
 
 (defvar helm-gtags-cache-alist
   `((:tag    . ,helm-gtags-tag-cache)
     (:rtag   . ,helm-gtags-rtag-cache)
     (:symbol . ,helm-gtags-symbol-cache)
+    (:from-here . ,helm-gtags-from-here-cache)
     (:file   . ,helm-gtags-file-cache)))
 
 (defvar helm-gtags-buf-alist
@@ -188,14 +190,21 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (:rtag       . " *helm-gtags-rtags*")
     (:symbol     . " *helm-gtags-symbol*")
     (:file       . " *helm-gtags-files*")
-    (:tag-here   . " *helm-gtags-tags-here*")
+    (:from-here   . " *helm-gtags-tags-here*")
     (:parse-file . " *helm-gtags-tags-parse-file*")))
 
 (defvar helm-gtags-command-option-alist
   '((:rtag   . "--reference")
     (:completion . "--completion")
     (:symbol . "--symbol")
+    (:from-here   . "--from-here=%d:%s")
     (:file   . "-Poa")))
+
+(defsubst helm-gtags-get-buf-alist (key)
+  (assoc-default key helm-gtags-cache-alist))
+
+(defsubst helm-gtags-set-buf-alist (key value)
+  (setf (cdr (assoc key helm-gtags-cache-alist)) value))
 
 (defsubst helm-gtags-type-is-not-file-p (type)
   (not (eq type :file)))
@@ -281,12 +290,18 @@ depending on `helm-gtags-GTAGSLIBPATH-alist'"
 (defsubst helm-gtags-use-abs-path-p (gtagslibpath)
   (and (helm-gtags-windows-p) gtagslibpath))
 
-(defun helm-gtags-construct-option (type &optional in)
+;; need use current-buffer when for --from-here
+(defun helm-gtags-construct-option(type &optional in)
   (let (options
         (type-opt (assoc-default type helm-gtags-command-option-alist))
         (gtagslibpath (getenv "GTAGSLIBPATH")))
     (when in (push in options))
-    (helm-aif type-opt (push it options))
+    (helm-aif type-opt
+        (if  (eq type :from-here)
+            (push (format it (line-number-at-pos)
+                          (helm-gtags-local-file-name))
+                  options)
+          (push it options)))
     (unless  (eq type :file)
       (push "--result=grep" options))
     (when helm-gtags-ignore-case
@@ -347,6 +362,13 @@ if `with-process-p' not nil then use global -p find gtagsroot"
                    (setq tag-location (concat it tag-location)))
                tag-location))))))
 
+
+(defun helm-gtags-base-directory (&optional tagroot)
+  (cl-case helm-gtags-path-style
+    (root (or tagroot
+              (helm-gtags-find-tagroot t)))
+    (otherwise default-directory)))
+
 (defun helm-source-gtags-complete-init()
   (let* ((tagroot (helm-gtags-find-tagroot))
          (prefix (helm-gtags-token-at-point))
@@ -380,27 +402,6 @@ if `with-process-p' not nil then use global -p find gtagsroot"
   (helm-gtags-common '(helm-source-gtags-complete)
                      (helm-gtags-token-at-point)))
 
-(defun helm-gtags-find-tag-from-here-cands-cmd()
-  (let ((candidates-buf (get-buffer-create (assoc-default :tag-here helm-gtags-buf-alist)))
-        token from-here
-        (buf-filename (file-truename (buffer-file-name helm-current-buffer))))
-    (with-current-buffer helm-current-buffer
-      (run-hooks 'helm-gtags-select-before-hook)
-      (setq token (or (thing-at-point 'symbol) ""))
-      (setq from-here (format "--from-here=%d:%s" (line-number-at-pos) buf-filename))
-      )
-    (with-current-buffer candidates-buf
-      (erase-buffer)
-      (when helm-gtags-debug
-        (message "[helm-gtags]:[%s --result=grep  %s %s] in directory:%s"
-                 helm-gtags-global-cmd from-here token default-directory))
-      (process-file helm-gtags-global-cmd nil (current-buffer) nil
-                    "--result=grep" from-here token))
-    candidates-buf))
-
-(defun helm-gtags-candidates-in-buffer-tag-from-here()
-  (helm-gtags-candidates-in-buffer
-   (helm-gtags-find-tag-from-here-cands-cmd)))
 
 
 (defun helm-gtags-candidates-in-buffer-parse-file()
@@ -439,16 +440,33 @@ if `with-process-p' not nil then use global -p find gtagsroot"
     (helm-gtags-do-open-file open-func helm-gtags-parsed-file line)
     (helm-gtags-goto-tag-pos)))
 
-
 (defun helm-gtags-action-openfile (_elm)
   (let* ((elm (helm-get-selection nil 'withprop))
          (elems (helm-gtags-split-line elm))
          (filename (or (get-text-property 0 'filename elm) (car elems)))
+         (file-path-style (get-text-property 0 'path-style elm))
          (line (string-to-number (cadr elems)))
           (open-func (helm-gtags-select-find-file-func))
          (default-directory (or (get-text-property 0 'default-directory elm) (helm-gtags-find-tagroot))))
+    (when (equal file-path-style 'absolute)
+      (setq filename (concat (file-remote-p default-directory) filename)))
     (helm-gtags-do-open-file open-func filename line)
     (helm-gtags-goto-tag-pos)))
+
+(defun helm-gtags-tags-persistent-action (_cand)
+  (let* ((c (helm-get-selection nil 'withprop))
+         (elems (helm-gtags-split-line c))
+         (filename (or (get-text-property 0 'filename c) (car elems)))
+         (file-path-style (get-text-property 0 'path-style c))
+         (line (string-to-number (cadr elems)))
+         (default-directory (or (get-text-property 0 'default-directory c)
+                                (helm-gtags-find-tagroot))))
+    (when (equal file-path-style 'absolute)
+      (setq filename (concat (file-remote-p default-directory) filename)))
+    (find-file filename)
+    (goto-char (point-min))
+    (forward-line (1- line))
+    (helm-highlight-current-line)))
 
 (defun helm-gtags-select-find-file-func()
   (if helm-gtags-use-otherwin
@@ -502,17 +520,6 @@ if `with-process-p' not nil then use global -p find gtagsroot"
                  this-file)))
     (setq helm-gtags-parsed-file (file-truename (expand-file-name file)))))
 
-(defun helm-gtags-tags-persistent-action (_cand)
-  (let* ((c (helm-get-selection nil 'withprop))
-         (elems (helm-gtags-split-line c))
-         (filename (or (get-text-property 0 'filename c) (car elems)))
-         (line (string-to-number (cadr elems)))
-         (default-directory (or (get-text-property 0 'default-directory c)
-                                (helm-gtags-find-tagroot))))
-    (find-file filename)
-    (goto-char (point-min))
-    (forward-line (1- line))
-    (helm-highlight-current-line)))
 
 
 (defun helm-gtags-common (srcs &optional input)
@@ -543,30 +550,37 @@ if `with-process-p' not nil then use global -p find gtagsroot"
         (run-hooks 'helm-gtags-quit-or-no-candidates-hook)))))
 
 (defun helm-gtags-exec-global-cmd(type tagroot &optional input)
-  (let ((candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist)))
-        (buf-coding buffer-file-coding-system)
-        cmd-options)
-    (setf (cdr (assoc type helm-gtags-cache-alist)) (list tagroot input))
-    ;; (with-current-buffer helm-current-buffer)
+  (let ((buf-coding buffer-file-coding-system)
+        candidates-buf basedir cmd-options)
+    (helm-gtags-set-buf-alist type (list tagroot input))
     (helm-gtags-with-env-GTAGSLIBPATH tagroot
+      (with-current-buffer helm-current-buffer
+        (setq basedir (helm-gtags-base-directory tagroot))
+        ;; --from-here need get linenum and filename
+        (setq cmd-options (helm-gtags-construct-command type input))
+        (setq candidates-buf (get-buffer-create (assoc-default type helm-gtags-buf-alist))))
       (with-current-buffer candidates-buf
         (erase-buffer)
         (let (tramp-remote-base
+              ;; default-directory must ends with /
+              (default-directory (file-name-as-directory basedir)) ;
               (coding-system-for-read buf-coding)
               (coding-system-for-write buf-coding))
-          (setq cmd-options (helm-gtags-construct-command type input))
+
           (when helm-gtags-debug
             (message "[helm-gtags]:[%s %s] in directory:%s"
                      helm-gtags-global-cmd
-                     (mapconcat 'identity cmd-options " ") tagroot))
+                     (mapconcat 'identity cmd-options " ") default-directory))
 
           (setq tramp-remote-base (file-remote-p tagroot))
+
           (when (zerop (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil cmd-options))
-            (when (and tramp-remote-base (equal type :file))
-              (if (equal helm-gtags-path-style 'absolute)
-                  (helm-gtags-insert-at-each-bol tramp-remote-base)
-                  (helm-gtags-insert-at-each-bol default-directory))
-              )
+            (when tramp-remote-base
+              (cl-case type
+                (:file (helm-gtags-insert-at-each-bol tramp-remote-base))
+                (t
+                 (put-text-property (point-min) (point-max) 'path-style helm-gtags-path-style))))
+
             (put-text-property (point-min) (point-max) 'default-directory default-directory))
           (when (equal type :file)
             (helm-gtags-print-path-in-gtagslibpath cmd-options (current-buffer)))
@@ -585,10 +599,7 @@ if `with-process-p' not nil then use global -p find gtagsroot"
                      helm-gtags-global-cmd
                      (mapconcat 'identity cmd-options " ") path))
             (when (zerop (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil args))
-              (when tramp-remote-base
-                (if (equal helm-gtags-path-style 'absolute)
-                  (helm-gtags-insert-at-each-bol tramp-remote-base)
-                  (helm-gtags-insert-at-each-bol default-directory)))
+              (when tramp-remote-base (helm-gtags-insert-at-each-bol tramp-remote-base))
               (put-text-property (point-min) (point-max) 'default-directory default-directory)
               (append-to-buffer buf (point-min) (point-max)))
             ))))))
@@ -619,7 +630,7 @@ if `with-process-p' not nil then use global -p find gtagsroot"
   (let ((input (or in (car (helm-mm-split-pattern helm-pattern))))
         (candidates-buf (get-buffer (assoc-default type helm-gtags-buf-alist)))
         (tagroot (helm-gtags-find-tagroot t))
-        (cache-info (assoc-default type helm-gtags-cache-alist)))
+        (cache-info (helm-gtags-get-buf-alist type)))
     (when tagroot
       (if (and cache-info (bufferp candidates-buf)(buffer-live-p candidates-buf)
                (helm-gtags-use-cache-p type tagroot input cache-info))
@@ -639,10 +650,17 @@ if `with-process-p' not nil then use global -p find gtagsroot"
   (helm-gtags-candidates-in-buffer
    (helm-gtags-get-candidates-buf-with-cache :symbol in)))
 
-
 (defun helm-gtags-candidates-in-buffer-file(&optional in)
   (helm-gtags-candidates-in-buffer
    (helm-gtags-get-candidates-buf-with-cache :file in)))
+
+(defun helm-gtags-candidates-in-buffer-tag-from-here()
+  (let (token)
+    (with-current-buffer helm-current-buffer
+      (setq token (or (thing-at-point 'symbol) "")))
+    (helm-gtags-candidates-in-buffer
+     (helm-gtags-get-candidates-buf-with-cache
+      :from-here token))))
 
 (defun helm-gtags-candidates-in-buffer(buf)
   "similiar to `helm-candidates-in-buffer'"
@@ -697,16 +715,13 @@ if `with-process-p' not nil then use global -p find gtagsroot"
 
 
 (defvar helm-source-gtags-find-tag-from-here
-  (helm-build-in-buffer-source "GNU Global tags"
+  (helm-build-in-buffer-source "GNU Global tags(--from-here=linenum:file)"
     :init nil
     :candidates 'helm-gtags-candidates-in-buffer-tag-from-here
     :get-line 'buffer-substring
     :persistent-action 'helm-gtags-tags-persistent-action
     :candidate-number-limit helm-gtags-default-candidate-limit
-    :action  'helm-gtags-action-openfile
-    )
-  )
-
+    :action  'helm-gtags-action-openfile))
 
 (defvar helm-source-gtags-parse-file
   (helm-build-in-buffer-source "GNU GLOBAL Parsed File"
