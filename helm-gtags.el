@@ -155,6 +155,17 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   :group 'helm-gtags
   :type 'hook)
 
+(defface helm-gtags-file-face
+  '((t (:foreground "Lightgoldenrod4"
+                    :underline t)))
+  "Face used to highlight gtags filenames."
+  :group 'helm-gtags)
+
+(defface helm-gtags-line-num-face
+  '((t (:foreground "red"
+                    :underline t)))
+  "Face used to highlight line number."
+  :group 'helm-gtags)
 (defvar helm-gtags-last-update-time (float-time (current-time))
   "`global -u --single-update'")
 
@@ -541,6 +552,11 @@ if `with-process-p' not nil then use global -p find gtagsroot"
                 (:file (helm-gtags-insert-at-each-bol tramp-remote-base))
                 (t
                  (put-text-property (point-min) (point-max) 'path-style helm-gtags-path-style))))
+
+            ;; (goto-char (point-max))
+            (while (re-search-backward ":\\([0-9]+\\):" (point-min) t)
+              (add-face-text-property (match-beginning 1)(match-end 1) 'helm-gtags-line-num-face)
+              (add-face-text-property (match-beginning 0) (line-beginning-position) 'helm-gtags-file-face))
 
             (put-text-property (point-min) (point-max) 'default-directory default-directory))
           (when (equal type :file)
