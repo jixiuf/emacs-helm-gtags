@@ -195,7 +195,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
   '((:rtag   . "--reference")
     (:completion . "--completion")
     (:symbol . "--symbol")
-    (:file   . "-Po")))
+    (:file   . "-Poa")))
 
 (defsubst helm-gtags-type-is-not-file-p (type)
   (not (eq type :file)))
@@ -580,7 +580,11 @@ if `with-process-p' not nil then use global -p find gtagsroot"
         (let ((default-directory (file-name-as-directory path))
               (tramp-remote-base (file-remote-p path)))
           (with-temp-buffer
-            (when (zerop (apply 'process-file "global" nil (current-buffer) nil "-a" args))
+            (when helm-gtags-debug
+            (message "[helm-gtags]:[%s %s] in directory:%s"
+                     helm-gtags-global-cmd
+                     (mapconcat 'identity cmd-options " ") path))
+            (when (zerop (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil args))
               (when tramp-remote-base
                 (if (equal helm-gtags-path-style 'absolute)
                   (helm-gtags-insert-at-each-bol tramp-remote-base)
@@ -602,9 +606,14 @@ if `with-process-p' not nil then use global -p find gtagsroot"
           (insert content)))
       (goto-char (line-beginning-position)))))
 
-(defun helm-gtags-use-cache-p(tagroot input cache-info)
-  (and (string-equal input (nth 1 cache-info))
-       (string-equal tagroot (car cache-info))))
+(defun helm-gtags-use-cache-p(type tagroot input cache-info)
+  (cl-case type
+    (:file (and (string-prefix-p (nth 1 cache-info) input)
+                (or
+                 (not tagroot)
+                 (string-equal tagroot (car cache-info)))))
+    (t (and (string-equal tagroot (car cache-info))
+            (string-equal input (nth 1 cache-info))))))
 
 (defun helm-gtags-get-candidates-buf-with-cache(type &optional in)
   (let ((input (or in (car (helm-mm-split-pattern helm-pattern))))
@@ -613,7 +622,7 @@ if `with-process-p' not nil then use global -p find gtagsroot"
         (cache-info (assoc-default type helm-gtags-cache-alist)))
     (when tagroot
       (if (and cache-info (bufferp candidates-buf)(buffer-live-p candidates-buf)
-               (helm-gtags-use-cache-p tagroot input cache-info))
+               (helm-gtags-use-cache-p type tagroot input cache-info))
           candidates-buf
         (helm-gtags-exec-global-cmd type tagroot input)))))
 
