@@ -198,7 +198,9 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
     (:completion . "--completion")
     (:symbol . "--symbol")
     (:from-here   . "--from-here=%d:%s")
-    (:file   . "-Poa")))
+    (:file   . "-Poa")
+    (:parse-file . "")
+    ))
 
 (defsubst helm-gtags-get-buf-alist (key)
   (assoc-default key helm-gtags-cache-alist))
@@ -319,13 +321,13 @@ depending on `helm-gtags-GTAGSLIBPATH-alist'"
       (error "Input is empty!!"))
     (helm-gtags-construct-option type input)))
 
-(defun helm-gtags-local-file-name ()
-  (let ((buffile (buffer-file-name)))
-    (unless buffile
+(defun helm-gtags-local-file-name (&optional filename)
+  (let ((buf-file (or filename (buffer-file-name))))
+    (unless buf-file
       (error "This buffer is not related to file."))
-    (if (file-remote-p buffile)
-        (tramp-file-name-localname (tramp-dissect-file-name buffile))
-      (file-truename buffile))))
+    (if (file-remote-p buf-file)
+        (tramp-file-name-localname (tramp-dissect-file-name buf-file))
+      (file-truename buf-file))))
 
 (defsubst helm-gtags-read-gtagslabel ()
   (let ((labels '("--gtagslabel=default" "--gtagslabel=native"
@@ -404,22 +406,6 @@ if `with-process-p' not nil then use global -p find gtagsroot"
 
 
 
-(defun helm-gtags-candidates-in-buffer-parse-file()
-  (helm-gtags-candidates-in-buffer
-   (helm-gtags-parse-file-cmd)))
-
-(defun helm-gtags-parse-file-cmd()
-  (let ((candidates-buf (get-buffer-create (assoc-default :parse-file helm-gtags-buf-alist)))
-        )
-    (with-current-buffer candidates-buf
-      (erase-buffer)
-      (when helm-gtags-debug
-        (message "[helm-gtags]:[%s --result cscope -f %s] in directory:%s"
-                 helm-gtags-global-cmd helm-gtags-parsed-file default-directory))
-      (unless (zerop (process-file helm-gtags-global-cmd nil (current-buffer) nil
-                                   "--result" "cscope" "-f" helm-gtags-parsed-file))
-        (error "Failed: global --result cscope -f \"%s\"" helm-gtags-parsed-file)))
-    candidates-buf))
 
 (defun helm-gtags-goto-tag-pos()
   (require 'pulse)
@@ -432,13 +418,6 @@ if `with-process-p' not nil then use global -p find gtagsroot"
            (match-beginning 0) (match-end 0)))
       (goto-char old-pos)
       (pulse-momentary-highlight-one-line old-pos))))
-
-(defun helm-gtags-parse-file-action (cand)
-  (let ((line (when (string-match "\\s-+\\([1-9][0-9]*\\)\\s-+" cand)
-                (string-to-number (match-string 1 cand))))
-        (open-func (helm-gtags-select-find-file-func)))
-    (helm-gtags-do-open-file open-func helm-gtags-parsed-file line)
-    (helm-gtags-goto-tag-pos)))
 
 (defun helm-gtags-action-openfile (_elm)
   (let* ((elm (helm-get-selection nil 'withprop))
@@ -504,21 +483,6 @@ if `with-process-p' not nil then use global -p find gtagsroot"
     ;; may contain a ":".
     (cl-loop for n from 1 to 3 collect (match-string n line))))
 
-(defun helm-gtags-parse-file-candidate-transformer (file)
-  (let ((removed-file (replace-regexp-in-string "\\`\\S-+ " "" file)))
-    (when (string-match "\\`\\(\\S-+\\) \\(\\S-+\\) \\(.+\\)\\'" removed-file)
-      (format "%-25s %-5s %s"
-              (match-string 1 removed-file)
-              (match-string 2 removed-file)
-              (match-string 3 removed-file)))))
-
-
-(defun helm-gtags-set-parsed-file ()
-  (let* ((this-file (file-name-nondirectory (buffer-file-name)))
-         (file (if current-prefix-arg
-                   (read-file-name "Parsed File: " nil this-file)
-                 this-file)))
-    (setq helm-gtags-parsed-file (file-truename (expand-file-name file)))))
 
 
 
@@ -771,10 +735,57 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
   (interactive)
   (helm-gtags-common '(helm-source-gtags-find-tag-from-here)))
 
+(defun helm-gtags-candidates-in-buffer-parse-file()
+  (helm-gtags-candidates-in-buffer
+   (helm-gtags-parse-file-cmd)))
+
+(defun helm-gtags-parse-file-cmd()
+  (let ((candidates-buf (get-buffer-create (assoc-default :parse-file helm-gtags-buf-alist)))
+        (helm-gtags-parsed-file helm-gtags-parsed-file))
+    (when (file-remote-p helm-gtags-parsed-file)
+      (setq helm-gtags-parsed-file (helm-gtags-local-file-name helm-gtags-parsed-file)))
+    (with-current-buffer candidates-buf
+      (setq default-directory (with-current-buffer helm-current-buffer default-directory))
+      (erase-buffer)
+      (when helm-gtags-debug
+        (message "[helm-gtags]:[%s --result cscope -f %s] in directory:%s"
+                 helm-gtags-global-cmd helm-gtags-parsed-file default-directory))
+      (unless (zerop (process-file helm-gtags-global-cmd nil (current-buffer) nil
+                                   "--result" "cscope" "-f" helm-gtags-parsed-file))
+        (error "Failed: global --result cscope -f \"%s\" %S" helm-gtags-parsed-file
+               (buffer-string))
+        ))
+    candidates-buf))
+
+(defun helm-gtags-parse-file-action (cand)
+  (let ((line (when (string-match "\\s-+\\([1-9][0-9]*\\)\\s-+" cand)
+                (string-to-number (match-string 1 cand))))
+        (open-func (helm-gtags-select-find-file-func)))
+    (helm-gtags-do-open-file open-func helm-gtags-parsed-file line)
+    (helm-gtags-goto-tag-pos)))
+
+(defun helm-gtags-parse-file-candidate-transformer (file)
+  (let ((removed-file (replace-regexp-in-string "\\`\\S-+ " "" file)))
+    (when (string-match "\\`\\(\\S-+\\) \\(\\S-+\\) \\(.+\\)\\'" removed-file)
+      (format "%-25s %-5s %s"
+              (match-string 1 removed-file)
+              (match-string 2 removed-file)
+              (match-string 3 removed-file)))))
+
+
+(defun helm-gtags-set-parsed-file ()
+  (let* ((this-file (file-name-nondirectory (buffer-file-name)))
+         (file (if current-prefix-arg
+                   (read-file-name "Parsed File: " nil this-file)
+                 this-file)))
+    (setq helm-gtags-parsed-file (file-truename (expand-file-name file)))))
+
+
 ;;;###autoload
 (defun helm-gtags-parse-file()
   "parse file with gnu global"
   (interactive)
+  (print default-directory)
   (run-hooks 'helm-gtags-select-before-hook)
   (when (helm-gtags--using-other-window-p)
     (setq helm-gtags-use-otherwin t))
