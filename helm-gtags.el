@@ -271,20 +271,6 @@ depending on `helm-gtags-GTAGSLIBPATH-alist'"
 ;; (helm-gtags-set-GTAGSLIBPATH-alist "/tmp/" '("/tmp/" "/usr/"))
 ;; (helm-gtags-with-env-GTAGSLIBPATH "/tmp/" (message (getenv "GTAGSLIBPATH")) )
 
-
-
-(defun helm-gtags-delete-cur-symbol()
-  (let ((bound (bounds-of-thing-at-point 'symbol)))
-    (if bound
-        (delete-region (car bound) (cdr bound)))))
-
-(defun helm-gtags-token-at-point ()
-  "token before point"
-  (let ((bound (bounds-of-thing-at-point 'symbol)))
-    (if bound (buffer-substring-no-properties
-               (car bound) (point))
-      "")))
-
 (defsubst helm-gtags-windows-p ()
   (memq system-type '(windows-nt ms-dos)))
 
@@ -374,17 +360,14 @@ if `with-process-p' not nil then use global -p find gtagsroot"
 (defun helm-source-gtags-complete-init()
   (let* ((tagroot (helm-gtags-find-tagroot))
          (prefix (helm-gtags-token-at-point))
-         (cmd-options (helm-gtags-construct-command :completion prefix))
-         begin)
-    (with-current-buffer (helm-candidate-buffer 'global)
-        (goto-char (point-max))
-        (setq begin (point))
+         cmd-options )
+    (helm-gtags-with-env-GTAGSLIBPATH tagroot
+      (setq cmd-options (helm-gtags-construct-command :completion prefix))
+      (with-current-buffer (helm-candidate-buffer 'global)
         (when helm-gtags-debug
           (message "[helm-gtags]:[%s %s] in directory:%s"
                    helm-gtags-global-cmd (mapconcat 'identity cmd-options " ") tagroot))
-        (helm-gtags-with-env-GTAGSLIBPATH tagroot
-          (unless (zerop (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil cmd-options))
-          (delete-region begin (point)))))))
+        (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil cmd-options)))))
 
 (defvar helm-source-gtags-complete
     (helm-build-in-buffer-source "GNU GLOBAL complete"
@@ -396,6 +379,20 @@ if `with-process-p' not nil then use global -p find gtagsroot"
   "insert candidate at point"
   (helm-gtags-delete-cur-symbol)
   (insert cand))
+
+
+
+(defun helm-gtags-delete-cur-symbol()
+  (let ((bound (bounds-of-thing-at-point 'symbol)))
+    (if bound
+        (delete-region (car bound) (cdr bound)))))
+
+(defun helm-gtags-token-at-point ()
+  "token before point"
+  (let ((bound (bounds-of-thing-at-point 'symbol)))
+    (if bound (buffer-substring-no-properties
+               (car bound) (point))
+      "")))
 
 ;;;###autoload
 (defun helm-gtags-complete ()
@@ -550,7 +547,6 @@ if `with-process-p' not nil then use global -p find gtagsroot"
             (helm-gtags-print-path-in-gtagslibpath cmd-options (current-buffer)))
           ))) candidates-buf))
 
-
 (defun helm-gtags-print-path-in-gtagslibpath (args buf)
   (let ((libpath (getenv "GTAGSLIBPATH")))
     (when (and libpath (not (string= "" libpath)))
@@ -559,14 +555,13 @@ if `with-process-p' not nil then use global -p find gtagsroot"
               (tramp-remote-base (file-remote-p path)))
           (with-temp-buffer
             (when helm-gtags-debug
-            (message "[helm-gtags]:[%s %s] in directory:%s"
-                     helm-gtags-global-cmd
-                     (mapconcat 'identity cmd-options " ") path))
+              (message "[helm-gtags]:[%s %s] in directory:%s"
+                       helm-gtags-global-cmd
+                       (mapconcat 'identity args " ") path))
             (when (zerop (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil args))
               (when tramp-remote-base (helm-gtags-insert-at-each-bol tramp-remote-base))
               (put-text-property (point-min) (point-max) 'default-directory default-directory)
-              (append-to-buffer buf (point-min) (point-max)))
-            ))))))
+              (append-to-buffer buf (point-min) (point-max)))))))))
 
 (defun helm-gtags-insert-at-each-bol(content &optional buf)
   (with-current-buffer (or buf (current-buffer))
