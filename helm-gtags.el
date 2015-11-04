@@ -7,7 +7,7 @@
 ;; 纪秀峰 fork version
 ;; URL: https://github.com/jixiuf/emacs-helm-gtags
 ;; Author: 纪秀峰 <jixiuf@gmail.com>
-;; Version: 2.3
+;; Version: 2.4
 ;; Package-Requires: ((helm "1.8"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -780,7 +780,6 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
 (defun helm-gtags-parse-file()
   "parse file with gnu global"
   (interactive)
-  (print default-directory)
   (run-hooks 'helm-gtags-select-before-hook)
   (when (helm-gtags--using-other-window-p)
     (setq helm-gtags-use-otherwin t))
