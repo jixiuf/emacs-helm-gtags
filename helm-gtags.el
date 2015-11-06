@@ -314,7 +314,7 @@ depending on `helm-gtags-GTAGSLIBPATH-alist'"
 
 (defun helm-gtags-construct-command (type  &optional in)
   (let ((input (or in (car (helm-mm-split-pattern helm-pattern)))))
-    (when (and (string= input "") (helm-gtags-type-is-not-file-p type))
+    (when (and (string= input "") (not (memq type '(:file :completion))))
       (error "Input is empty!!"))
     (helm-gtags-construct-option type input)))
 
@@ -382,10 +382,12 @@ if `with-process-p' not nil then use global -p find gtagsroot"
           (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil cmd-options))))))
 
 (defvar helm-source-gtags-complete
-    (helm-build-in-buffer-source "GNU GLOBAL complete"
+  (helm-build-in-buffer-source "GNU GLOBAL complete"
     :init 'helm-source-gtags-complete-init
-    :candidate-number-limit helm-gtags-default-candidate-limit
+    :candidate-number-limit 100
+    :fuzzy-match  t
     :action 'helm-gtags-complete-insert-action))
+
 
 (defun helm-gtags-complete-insert-action(cand)
   "insert candidate at point"
