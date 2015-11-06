@@ -375,10 +375,11 @@ if `with-process-p' not nil then use global -p find gtagsroot"
     (helm-gtags-with-env-GTAGSLIBPATH tagroot
       (setq cmd-options (helm-gtags-construct-command :completion prefix))
       (with-current-buffer (helm-candidate-buffer 'global)
-        (when helm-gtags-debug
-          (message "[helm-gtags]:[%s %s] in directory:%s"
-                   helm-gtags-global-cmd (mapconcat 'identity cmd-options " ") tagroot))
-        (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil cmd-options)))))
+        (let ((default-directory tagroot))
+          (when helm-gtags-debug
+            (message "[helm-gtags]:[%s %s] in directory:%s"
+                     helm-gtags-global-cmd (mapconcat 'identity cmd-options " ") tagroot))
+          (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil cmd-options))))))
 
 (defvar helm-source-gtags-complete
     (helm-build-in-buffer-source "GNU GLOBAL complete"
