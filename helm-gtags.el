@@ -7,7 +7,7 @@
 ;; 纪秀峰 fork version
 ;; URL: https://github.com/jixiuf/emacs-helm-gtags
 ;; Author: 纪秀峰 <jixiuf@gmail.com>
-;; Version: 2.4
+;; Version: 2.5
 ;; Package-Requires: ((helm "1.8"))
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -379,7 +379,8 @@ if `with-process-p' not nil then use global -p find gtagsroot"
           (when helm-gtags-debug
             (message "[helm-gtags]:[%s %s] in directory:%s"
                      helm-gtags-global-cmd (mapconcat 'identity cmd-options " ") tagroot))
-          (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil cmd-options))))))
+          (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil cmd-options))
+        (helm-gtags-do-in-gtagslibpath :completion cmd-options (current-buffer))))))
 
 (defvar helm-source-gtags-complete
   (helm-build-in-buffer-source "GNU GLOBAL complete"
@@ -555,9 +556,9 @@ if `with-process-p' not nil then use global -p find gtagsroot"
             (put-text-property (point-min) (point-max) 'default-directory default-directory))
 
           (cl-case type
-            (:file (helm-gtags-print-path-in-gtagslibpath type cmd-options (current-buffer)))
+            (:file (helm-gtags-do-in-gtagslibpath type cmd-options (current-buffer)))
             (:symbol                    ;symbol doesnot support -T,so we need go throgh  GTAGSLIBPATH
-             (helm-gtags-print-path-in-gtagslibpath type cmd-options (current-buffer))
+             (helm-gtags-do-in-gtagslibpath type cmd-options (current-buffer))
              (put-text-property (point-min) (point-max) 'path-style helm-gtags-path-style))
             (t
              (put-text-property (point-min) (point-max) 'path-style helm-gtags-path-style)))
@@ -570,7 +571,7 @@ if `with-process-p' not nil then use global -p find gtagsroot"
 
           ))) candidates-buf))
 
-(defun helm-gtags-print-path-in-gtagslibpath (type args buf)
+(defun helm-gtags-do-in-gtagslibpath (type args buf)
   (let ((libpath (getenv "GTAGSLIBPATH")))
     (when (and libpath (not (string= "" libpath)))
       (dolist (path (parse-colon-path libpath))
