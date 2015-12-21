@@ -550,23 +550,27 @@ if `with-process-p' not nil then use global -p find gtagsroot"
           (setq tramp-remote-base (file-remote-p tagroot))
 
           (when (zerop (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil cmd-options))
-            (when tramp-remote-base
-              (cl-case type
-                (:file (helm-gtags-insert-at-each-bol tramp-remote-base))
-                (t
-                 (put-text-property (point-min) (point-max) 'path-style helm-gtags-path-style))))
+            (when (and tramp-remote-base (equal type :file))
+              (helm-gtags-insert-at-each-bol tramp-remote-base))
+            (put-text-property (point-min) (point-max) 'default-directory default-directory))
 
-            ;; (goto-char (point-max))
+          (cl-case type
+            (:file (helm-gtags-print-path-in-gtagslibpath type cmd-options (current-buffer)))
+            (:symbol                    ;symbol doesnot support -T,so we need go throgh  GTAGSLIBPATH
+             (helm-gtags-print-path-in-gtagslibpath type cmd-options (current-buffer))
+             (put-text-property (point-min) (point-max) 'path-style helm-gtags-path-style))
+            (t
+             (put-text-property (point-min) (point-max) 'path-style helm-gtags-path-style)))
+
+          (unless (equal type :file)
+            (goto-char (point-max))
             (while (re-search-backward ":\\([0-9]+\\):" (point-min) t)
               (add-face-text-property (match-beginning 1)(match-end 1) 'helm-gtags-line-num-face)
-              (add-face-text-property (match-beginning 0) (line-beginning-position) 'helm-gtags-file-face))
+              (add-face-text-property (match-beginning 0) (line-beginning-position) 'helm-gtags-file-face)))
 
-            (put-text-property (point-min) (point-max) 'default-directory default-directory))
-          (when (equal type :file)
-            (helm-gtags-print-path-in-gtagslibpath cmd-options (current-buffer)))
           ))) candidates-buf))
 
-(defun helm-gtags-print-path-in-gtagslibpath (args buf)
+(defun helm-gtags-print-path-in-gtagslibpath (type args buf)
   (let ((libpath (getenv "GTAGSLIBPATH")))
     (when (and libpath (not (string= "" libpath)))
       (dolist (path (parse-colon-path libpath))
@@ -578,7 +582,8 @@ if `with-process-p' not nil then use global -p find gtagsroot"
                        helm-gtags-global-cmd
                        (mapconcat 'identity args " ") path))
             (when (zerop (apply 'process-file helm-gtags-global-cmd nil (current-buffer) nil args))
-              (when tramp-remote-base (helm-gtags-insert-at-each-bol tramp-remote-base))
+              (when (and (equal type :file) tramp-remote-base)
+                (helm-gtags-insert-at-each-bol tramp-remote-base))
               (put-text-property (point-min) (point-max) 'default-directory default-directory)
               (append-to-buffer buf (point-min) (point-max)))))))))
 
