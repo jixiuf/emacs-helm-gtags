@@ -281,8 +281,3 @@ you just need this lines:
 ```
 
 
-      (helm-gtags-set-GTAGSLIBPATH-alist (concat xcode-proj-root project-name)
-                                         `(
-                                           ;; ,(concat xcode-proj-root project-name)
-                                           "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.12.sdk"
-                                           "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"))
