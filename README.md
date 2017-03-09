@@ -82,6 +82,10 @@ You could add your lib directory here ,like
       '(("/path/to/project1"  "/usr/include/" "/usr/kernel/")
         ("/path/to/project2" "/path/of/tag/2/" "/path/of/tag/3/")))
 "/path/to/project1" and "/path/to/project2" can NOT ends with /
+;;or 
+;;(helm-gtags-set-GTAGSLIBPATH-alist "~/repos/emacs/" '("/usr/include" "/usr/local/include"))
+;;(helm-gtags-set-GTAGSLIBPATH-alist "~/repos/demo_opencv/" '("/usr/include"  "/usr/local/Cellar/opencv3/3.0.0/include/"  "/usr/local/include"))
+
 
 you neednot set this if you just use one tag
 
@@ -209,9 +213,16 @@ you just need this lines:
 (setq helm-gtags-auto-update t)
 
 ;;you neednot set this if you just use one tag
-(setq helm-gtags-tag-location-alist
-      '((c-mode  "/usr/include/" "/usr/kernel/")
-        (c++-mode  "/path/of/tag/2/" "/path/of/tag/3/")))
+ (setq helm-gtags-GTAGSLIBPATH-alist
+       '(
+         ("~/repos/emacs/"  "/usr/include/" "/usr/local/include")
+         ("/Users/admin/repos/hello_c/opencv" "/usr/local/Cellar/opencv3/3.0.0/include/" "/usr/local/include")
+         ))
+;;(helm-gtags-set-GTAGSLIBPATH-alist "~/repos/emacs/" '("/usr/include" "/usr/local/include"))
+;;(helm-gtags-set-GTAGSLIBPATH-alist "~/repos/demo_opencv/" '("/usr/include"  "/usr/local/Cellar/opencv3/3.0.0/include/"  "/usr/local/include"))
+         
+
+        
 
 (eval-after-load "helm-gtags" '(add-to-list 'helm-for-files-preferred-list helm-source-gtags-files t))
 
@@ -268,3 +279,10 @@ you just need this lines:
 ;; (add-hook 'helm-gtags-quit-or-no-candidates-hook 'bm-bookmark-remove)
 
 ```
+
+
+      (helm-gtags-set-GTAGSLIBPATH-alist (concat xcode-proj-root project-name)
+                                         `(
+                                           ;; ,(concat xcode-proj-root project-name)
+                                           "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.12.sdk"
+                                           "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"))
