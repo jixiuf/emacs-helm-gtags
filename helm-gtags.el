@@ -8,7 +8,7 @@
 ;; URL: https://github.com/jixiuf/emacs-helm-gtags
 ;; Author: 纪秀峰 <jixiuf@gmail.com>
 ;; Version: 2.5
-;; Package-Requires: ((helm "1.8"))
+;; Package-Requires: ((helm-core "2.7.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -57,9 +57,9 @@
 
 (require 'helm)
 (require 'helm-multi-match)
-(require 'helm-types)
+;; (require 'helm-types)
 (require 'helm-source)
-(require 'helm-utils)
+;; (require 'helm-utils)
 (require 'thingatpt)
 (require 'tramp)
 
@@ -169,7 +169,7 @@ then `helm-gtags-update-tags' will be called,nil means update immidiately"
 (defvar helm-gtags-last-update-time (float-time (current-time))
   "`global -u --single-update'")
 
-(defvar helm-gtags-buffer "*helm gtags*")
+(defvar helm-gtags-buffer " *helm gtags*")
 
 (defvar helm-gtags-prompt-alist
   '((:tag    . "Find Definition: ")
@@ -338,8 +338,9 @@ depending on `helm-gtags-GTAGSLIBPATH-alist'"
        (if (not (yes-or-no-p "File GTAGS not found. generate now? "))
            (user-error "Abort")
          (let* ((tagroot (read-directory-name "Generate tags at Directory: "))
+                (default-directory tagroot)
                 (label (helm-gtags-read-gtagslabel)))
-           (message "gtags is generating tags....")
+           (message "gtags is generating tags....%s" tagroot)
            (if (zerop (process-file "gtags" nil nil nil "-q" label))
                (message "generating tags done!!!")
              (error "Faild: 'gtags -q'"))
@@ -457,7 +458,8 @@ if `with-process-p' not nil then use global -p find gtagsroot"
     (find-file filename)
     (goto-char (point-min))
     (forward-line (1- line))
-    (helm-highlight-current-line)))
+    ;; (helm-highlight-current-line)
+    ))
 
 (defun helm-gtags-select-find-file-func()
   (if helm-gtags-use-otherwin
@@ -601,13 +603,19 @@ if `with-process-p' not nil then use global -p find gtagsroot"
           (insert content)))
       (goto-char (line-beginning-position)))))
 
+
 (defun helm-gtags-use-cache-p(type tagroot input cache-info)
   (cl-case type
-    (:file (and (string-prefix-p (nth 1 cache-info) input)
+    (:file (and input
+                cache-info
+                (nth 1 cache-info)
+                (string-prefix-p (nth 1 cache-info) input)
                 (or
                  (not tagroot)
+                 (car cache-info)
                  (string-equal tagroot (car cache-info)))))
-    (t (and (string-equal tagroot (car cache-info))
+    (t (and input
+            (string-equal tagroot (car cache-info))
             (string-equal input (nth 1 cache-info))))))
 
 (defun helm-gtags-get-candidates-buf-with-cache(type &optional in)
@@ -695,7 +703,15 @@ if `with-process-p' not nil then use global -p find gtagsroot"
     :init  nil
     :candidates 'helm-gtags-candidates-in-buffer-file
     :candidate-number-limit helm-gtags-default-candidate-limit
-    :action (helm-actions-from-type-file)))
+    :action 'helm-find-many-files))
+
+(defun helm-find-many-files (_ignore)
+  "Simple action that run `find-file' on marked candidates.
+Run `helm-find-many-files-after-hook' at end"
+  (let ((helm--reading-passwd-or-string t))
+    (mapc 'find-file (helm-marked-candidates))
+    ))
+
 
 
 (defvar helm-source-gtags-find-tag-from-here
@@ -828,6 +844,7 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
 
 (defun helm-gtags-read-tag-directory ()
   (let ((dir (read-directory-name "Directory tag generated: " nil nil t)))
+    (message dir)
     ;; On Windows, "gtags d:/tmp" work, but "gtags d:/tmp/" doesn't
     (directory-file-name (expand-file-name dir))))
 
@@ -839,6 +856,7 @@ you could add `helm-source-gtags-files' to `helm-for-files-preferred-list'"
 
 
 (defun helm-gtags-update-tags-command (how-to)
+  (print how-to)
   (cl-case how-to
     (entire-update (list helm-gtags-global-cmd "-u"))
     (generate-other-directory (list helm-gtags-cmd (helm-gtags-read-gtagslabel) (helm-gtags-read-tag-directory)))
